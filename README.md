@@ -1,0 +1,1 @@
+# ghostty-mirror.nvim
