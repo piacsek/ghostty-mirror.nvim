@@ -7,9 +7,12 @@ Mirror Neovim's colorscheme into [Ghostty](https://ghostty.org). When you run
 `:colorscheme foo` in Neovim, Ghostty's terminal theme flips to match — across
 every open window, instantly.
 
+https://github.com/user-attachments/assets/768f8303-ab48-4e46-9e58-f9e7b1df7386
+
 A `:ThemeFromGhostty` command (bound to `<M-t>` by default) goes the other way:
 pulls the theme Ghostty is currently using and applies it locally. Useful for
 syncing other Neovim instances running in different tmux panes.
+
 
 ## How it works
 
