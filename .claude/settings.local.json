@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make test *)",
+      "Read(//Users/piacsek/.local/share/nvim/**)",
+      "Read(//Users/piacsek/dotfiles/nvim/**)"
+    ]
+  }
+}
