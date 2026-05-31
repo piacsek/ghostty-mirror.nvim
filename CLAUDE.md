@@ -40,6 +40,7 @@ It must not touch the user's main Ghostty config or their hand-made theme files.
 - Gotcha: setting `vim.o.background` re-applies the colorscheme and clobbers manually-set highlight groups. Set `background` **before** `nvim_set_hl` in test setup.
 - Tests mutating global state (`vim.o.background`, `vim.g.terminal_color_*`, highlights) must restore it — other specs depend on defaults.
 - A successful iteration (specs green via `make test`) can be committed and pushed to `main`.
+- After committing/pushing, update the locally-installed copy so the change is testable in the user's running Neovim. It's installed via `vim.pack` at `~/.local/share/nvim/site/pack/core/opt/ghostty-mirror.nvim` — `git -C <that path> pull --ff-only origin main`. The user then restarts Neovim (or re-`require`s the module) to load it.
 
 ## Docs
 
