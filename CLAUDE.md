@@ -33,6 +33,7 @@ It must not touch the user's main Ghostty config or their hand-made theme files.
 
 ## Testing
 
+- **Default workflow: use the `/tdd` skill** to iterate on this repo — write a failing spec first, make it pass, refactor, in small increments. Behavior changes start from a test, not from the implementation.
 - Run: `make test` (headless nvim + `PlenaryBustedDirectory`). Requires plenary on the runtimepath; `minimal_init.lua` finds it in common locations.
 - CI (`.github/workflows/test.yml`) runs `make test` on Neovim **stable** and **nightly** for every push to `main` and every PR. Keep both green.
 - **Every behavior change needs a test.** Reuse the spec helpers: `with_tmp_dir`, `fresh_require` (reloads the module for a clean config), `stub_system` (captures reload invocations).
