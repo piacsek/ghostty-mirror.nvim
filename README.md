@@ -43,7 +43,7 @@ the 16-color `palette`. ghostty-mirror's strategy:
 Most well-maintained colorschemes (catppuccin, tokyonight, kanagawa, gruvbox,
 rose-pine, …) set `terminal_color_*`, so generation is zero-config for them.
 For ones that don't — or when you want pixel-perfect control — drop a hand-made
-file in `themes_dir` (the Claude Code skill below can author one for you).
+file in `themes_dir` (the bundled Claude Code skill can author one for you).
 
 The plugin owns *only* the include file and the themes it generates — it does
 not touch your main Ghostty config or your hand-made theme files.
@@ -52,49 +52,61 @@ not touch your main Ghostty config or your hand-made theme files.
 
 ### Step 1 — wire Ghostty to read the theme file
 
-Add this line to your `~/.config/ghostty/config` **before** any
-`background`/`foreground`/`palette` settings (or remove those settings
-entirely so themes can drive them):
+Add this to `~/.config/ghostty/config`, and remove any hardcoded
+`background`/`foreground`/`palette` lines (they override theme files):
 
 ```
 config-file = ?~/.config/ghostty/theme-current
 ```
 
-The `?` prefix makes the include optional, so Ghostty won't error before the
-file exists.
+The `?` makes the include optional, so Ghostty won't error before the file exists.
 
-> **Important:** any hardcoded `background`, `foreground`, or `palette = N=...`
-> lines in your main config will override theme files. Move those into theme
-> files instead, or delete them.
+### Step 2 — install the plugin
 
-### Step 2 — (optional) provide theme files
+`vim.pack`:
 
-By default the plugin **generates** a Ghostty theme on the fly from the
-colorscheme's live highlights, so for most colorschemes you don't need to do
-anything here. You only need a hand-made file when:
+```lua
+vim.pack.add({ "https://github.com/piacsek/ghostty-mirror.nvim" })
+```
 
-- the colorscheme doesn't set `g:terminal_color_0..15` (generation is skipped), or
-- you want finer control than the automatic mapping gives.
+`lazy.nvim`:
 
-To provide one, put a matching theme file at
-`~/.config/ghostty/themes/<colorscheme-name>` (no extension). A hand-made file
-always wins over generation.
+```lua
+{
+  "piacsek/ghostty-mirror.nvim",
+  event = "VimEnter",
+  cmd = { "ThemeFromGhostty", "ThemeToGhostty" },
+  keys = { { "<M-t>", desc = "Pull theme from Ghostty" } },
+}
+```
 
-> **Tip:** if you use [Claude Code](https://claude.com/claude-code), this
-> repo ships a skill at `.claude/skills/port-nvim-theme-to-ghostty/` that
-> walks an agent through extracting palettes from any Neovim colorscheme
-> (bundled, plugin, or shipped Ghostty extras) and writing the right theme
-> file. Add this repo with `--add-dir` (or symlink the skill into your
-> `~/.claude/skills/`) and ask "port `<colorscheme>` to ghostty" — it'll
-> handle the lookup and the file write for you.
+The plugin auto-registers the `ColorScheme` autocmd, the commands, and the
+`<M-t>` keymap with sensible defaults. To override them, call `setup`:
 
-Format:
+```lua
+require("ghostty-mirror").setup({
+  themes_dir = "~/.config/ghostty/themes",          -- where themes live / are cached
+  theme_file = "~/.config/ghostty/theme-current",   -- the include file the plugin writes
+  keymap = "<M-t>",                                 -- false to disable
+  user_command = "ThemeFromGhostty",                -- false to disable
+  regenerate_command = "ThemeToGhostty",            -- false to disable
+  light_variant_suffix = "-light",                  -- light/dark variant routing
+  generate = true,                                  -- false to require hand-made files
+  reload_command = { "pkill", "-SIGUSR2", "ghostty" },
+})
+```
+
+### Step 3 — (optional) hand-made theme files
+
+Themes are generated on the fly by default, so you only need this when a
+colorscheme doesn't set `g:terminal_color_*` or you want manual control. Drop a
+file at `~/.config/ghostty/themes/<colorscheme-name>` — a hand-made file always
+wins over generation:
 
 ```
 background = #1e1e2e
 foreground = #cdd6f4
 cursor-color = #f5e0dc
-
 palette = 0=#45475a
 palette = 1=#f38ba8
 palette = 2=#a6e3a1
@@ -113,47 +125,12 @@ palette = 14=#94e2d5
 palette = 15=#a6adc8
 ```
 
-Ghostty ships with a long list of built-in themes — `ghostty +list-themes`
-shows them. To use an existing one, the file is one line: `theme = <name>`.
+To reuse a built-in Ghostty theme (`ghostty +list-themes`), the file is one
+line: `theme = <name>`.
 
-### Step 3 — install the plugin
-
-With `vim.pack`:
-
-```lua
-vim.pack.add({ "https://github.com/piacsek/ghostty-mirror.nvim" })
-```
-
-With `lazy.nvim`:
-
-```lua
-{
-  "piacsek/ghostty-mirror.nvim",
-  event = "VimEnter",                     -- register the ColorScheme autocmd before any user :colorscheme call
-  cmd = { "ThemeFromGhostty", "ThemeToGhostty" }, -- but also load on the user commands
-  keys = { { "<M-t>", desc = "Pull theme from Ghostty" } },
-}
-```
-
-`lazy = false` works too (and is simplest), but the spec above keeps startup
-fast while still loading the plugin before you'd realistically change a
-colorscheme. The plugin auto-registers a `ColorScheme` autocmd, the
-`:ThemeFromGhostty` command, and the `<M-t>` keymap with sensible defaults.
-
-If you want to customize anything, call `setup` explicitly:
-
-```lua
-require("ghostty-mirror").setup({
-  themes_dir = "~/.config/ghostty/themes",          -- where Ghostty looks for (and the plugin caches) themes
-  theme_file = "~/.config/ghostty/theme-current",   -- the include file the plugin writes to
-  keymap = "<M-t>",                                 -- false to disable
-  user_command = "ThemeFromGhostty",                -- false to disable
-  regenerate_command = "ThemeToGhostty",            -- force-regenerate current colorscheme; false to disable
-  light_variant_suffix = "-light",                  -- routing for plugins that ship light/dark variants
-  generate = true,                                  -- generate themes on the fly; false to require hand-made files
-  reload_command = { "pkill", "-SIGUSR2", "ghostty" },
-})
-```
+> **Tip:** with [Claude Code](https://claude.com/claude-code), this repo's
+> `.claude/skills/port-nvim-theme-to-ghostty/` skill writes these files for you
+> — add the repo with `--add-dir` and ask "port `<colorscheme>` to ghostty".
 
 ## Usage
 
@@ -170,7 +147,7 @@ If you change colorschemes and Ghostty doesn't follow, the colorscheme likely
 doesn't expose a `g:terminal_color_*` palette and has no hand-made file at
 `~/.config/ghostty/themes/<colorscheme>`. The plugin no-ops silently in that
 case — it never writes a theme name Ghostty can't load. Drop a hand-made file
-there (the skill below can author one).
+there (the bundled skill can author one).
 
 ## Light/dark variants
 
