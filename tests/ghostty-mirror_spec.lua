@@ -184,6 +184,18 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("creates themes_dir when it does not exist before writing", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/nested/themes"
+					local mirror = fresh_require()
+					mirror.setup({ themes_dir = themes_dir, generate = true })
+					assert.equals("mytheme", mirror.resolve("mytheme"))
+					assert.equals(1, vim.fn.filereadable(themes_dir .. "/mytheme"))
+				end)
+			end)
+		end)
+
 		it("prefers an existing hand-made file over generating", function()
 			with_palette(function()
 				with_tmp_dir(function(themes_dir)

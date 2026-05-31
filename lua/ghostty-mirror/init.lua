@@ -102,6 +102,7 @@ function M.write_generated(colorscheme)
 	local lines = M.generate(colorscheme)
 	if not lines then return nil end
 	local name = target_name(colorscheme)
+	vim.fn.mkdir(M.config.themes_dir, "p")
 	vim.fn.writefile(lines, M.config.themes_dir .. "/" .. name)
 	return name
 end
