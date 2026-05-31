@@ -14,40 +14,6 @@ pulls the theme Ghostty is currently using and applies it locally. Useful for
 syncing other Neovim instances running in different tmux panes.
 
 
-## How it works
-
-A Ghostty theme called `foo` is just a file at
-`~/.config/ghostty/themes/foo` that defines `background`, `foreground`, and
-the 16-color `palette`. ghostty-mirror's strategy:
-
-1. On `ColorScheme`, it resolves a theme name for the colorscheme (see
-   precedence below), writes `theme = <name>` to a small file Ghostty includes
-   in its config (`~/.config/ghostty/theme-current` by default).
-2. It signals Ghostty (`SIGUSR2`) to reload its config.
-3. Ghostty re-reads the include and applies the new theme.
-
-**Resolving the theme name** follows this precedence:
-
-1. A hand-made/cached file at `themes_dir/<name>` (honoring the
-   `-light` variant when `&background` is `"light"`) — highest fidelity.
-2. Otherwise, **generated on the fly** from Neovim's *live* highlights:
-   `background`/`foreground` from `Normal`, `cursor-color` from `Cursor`,
-   `selection-background` from `Visual`, and `palette = 0..15` from the
-   colorscheme's `g:terminal_color_0..15`. The generated theme is cached to
-   `themes_dir/<name>` so you can hand-edit it later. (Set `generate = false`
-   to disable.)
-3. If a colorscheme doesn't define a full `terminal_color_*` palette,
-   generation is skipped silently — the plugin never writes a partial,
-   wrong-looking theme.
-
-Most well-maintained colorschemes (catppuccin, tokyonight, kanagawa, gruvbox,
-rose-pine, …) set `terminal_color_*`, so generation is zero-config for them.
-For ones that don't — or when you want pixel-perfect control — drop a hand-made
-file in `themes_dir` (the bundled Claude Code skill can author one for you).
-
-The plugin owns *only* the include file and the themes it generates — it does
-not touch your main Ghostty config or your hand-made theme files.
-
 ## Installation
 
 ### Step 1 — wire Ghostty to read the theme file
@@ -131,6 +97,40 @@ line: `theme = <name>`.
 > **Tip:** with [Claude Code](https://claude.com/claude-code), this repo's
 > `.claude/skills/port-nvim-theme-to-ghostty/` skill writes these files for you
 > — add the repo with `--add-dir` and ask "port `<colorscheme>` to ghostty".
+
+## How it works
+
+A Ghostty theme called `foo` is just a file at
+`~/.config/ghostty/themes/foo` that defines `background`, `foreground`, and
+the 16-color `palette`. ghostty-mirror's strategy:
+
+1. On `ColorScheme`, it resolves a theme name for the colorscheme (see
+   precedence below), writes `theme = <name>` to a small file Ghostty includes
+   in its config (`~/.config/ghostty/theme-current` by default).
+2. It signals Ghostty (`SIGUSR2`) to reload its config.
+3. Ghostty re-reads the include and applies the new theme.
+
+**Resolving the theme name** follows this precedence:
+
+1. A hand-made/cached file at `themes_dir/<name>` (honoring the
+   `-light` variant when `&background` is `"light"`) — highest fidelity.
+2. Otherwise, **generated on the fly** from Neovim's *live* highlights:
+   `background`/`foreground` from `Normal`, `cursor-color` from `Cursor`,
+   `selection-background` from `Visual`, and `palette = 0..15` from the
+   colorscheme's `g:terminal_color_0..15`. The generated theme is cached to
+   `themes_dir/<name>` so you can hand-edit it later. (Set `generate = false`
+   to disable.)
+3. If a colorscheme doesn't define a full `terminal_color_*` palette,
+   generation is skipped silently — the plugin never writes a partial,
+   wrong-looking theme.
+
+Most well-maintained colorschemes (catppuccin, tokyonight, kanagawa, gruvbox,
+rose-pine, …) set `terminal_color_*`, so generation is zero-config for them.
+For ones that don't — or when you want pixel-perfect control — drop a hand-made
+file in `themes_dir` (the bundled Claude Code skill can author one for you).
+
+The plugin owns *only* the include file and the themes it generates — it does
+not touch your main Ghostty config or your hand-made theme files.
 
 ## Usage
 
