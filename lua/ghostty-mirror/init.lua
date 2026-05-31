@@ -7,9 +7,6 @@ local M = {}
 ---@class GhosttyMirrorConfig
 ---@field themes_dir string Directory Ghostty reads themes from. Defaults to ~/.config/ghostty/themes.
 ---@field theme_file string Path Ghostty reads the active theme from via config-file include. Defaults to ~/.config/ghostty/theme-current.
----@field keymap string|false Keymap that triggers :ThemeFromGhostty (pulls the theme from the file instead of writing to it). Set to false to skip the keymap.
----@field user_command string|false Name of the user command that pulls the theme from Ghostty's theme-current file. Set to false to skip the command.
----@field regenerate_command string|false Name of the user command that force-regenerates the current colorscheme's theme file from live highlights, overwriting any cached/hand-made file. Set to false to skip the command.
 ---@field light_variant_suffix string Suffix used when looking for light-mode variant files (e.g. "cyberdream-light"). Set to "" or false to disable.
 ---@field generate boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
 ---@field reload_command string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
@@ -18,9 +15,6 @@ local M = {}
 local defaults = {
 	themes_dir = vim.fn.expand("~/.config/ghostty/themes"),
 	theme_file = vim.fn.expand("~/.config/ghostty/theme-current"),
-	keymap = "<M-t>",
-	user_command = "ThemeFromGhostty",
-	regenerate_command = "ThemeToGhostty",
 	light_variant_suffix = "-light",
 	generate = true,
 	reload_command = { "pkill", "-SIGUSR2", "ghostty" },
@@ -179,25 +173,15 @@ function M.setup(opts)
 		callback = function(ev) M.push(ev.match) end,
 	})
 
-	if M.config.user_command then
-		vim.api.nvim_create_user_command(M.config.user_command, M.pull, {
-			desc = "Apply the colorscheme currently set in Ghostty's theme-current file",
-		})
-	end
+	vim.api.nvim_create_user_command("ThemeFromGhostty", M.pull, {
+		desc = "Apply the colorscheme currently set in Ghostty's theme-current file",
+	})
 
-	if M.config.regenerate_command then
-		vim.api.nvim_create_user_command(M.config.regenerate_command, function()
-			M.push(vim.g.colors_name or "", { force = true })
-		end, {
-			desc = "Regenerate the current colorscheme's Ghostty theme from live highlights",
-		})
-	end
-
-	if M.config.keymap then
-		local cmd = M.config.user_command and ("<cmd>" .. M.config.user_command .. "<cr>")
-			or function() M.pull() end
-		vim.keymap.set("n", M.config.keymap, cmd, { desc = "Pull colorscheme from Ghostty" })
-	end
+	vim.api.nvim_create_user_command("ThemeToGhostty", function()
+		M.push(vim.g.colors_name or "", { force = true })
+	end, {
+		desc = "Regenerate the current colorscheme's Ghostty theme from live highlights",
+	})
 end
 
 return M

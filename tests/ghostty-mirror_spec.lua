@@ -274,34 +274,22 @@ describe("ghostty-mirror", function()
 			assert.is_true(#autocmds > 0)
 		end)
 
-		it("creates the user command by default", function()
+		it("creates the ThemeFromGhostty command", function()
 			local mirror = fresh_require()
 			mirror.setup()
 			assert.is_not_nil(vim.api.nvim_get_commands({})["ThemeFromGhostty"])
 		end)
 
-		it("skips the user command when user_command is false", function()
-			pcall(vim.api.nvim_del_user_command, "ThemeFromGhostty")
-			local mirror = fresh_require()
-			mirror.setup({ user_command = false })
-			assert.is_nil(vim.api.nvim_get_commands({})["ThemeFromGhostty"])
-		end)
-
-		it("registers the keymap by default", function()
+		it("creates the ThemeToGhostty command", function()
 			local mirror = fresh_require()
 			mirror.setup()
-			local maps = vim.api.nvim_get_keymap("n")
-			local found = false
-			for _, m in ipairs(maps) do
-				if m.lhs == "<M-t>" then found = true; break end
-			end
-			assert.is_true(found)
+			assert.is_not_nil(vim.api.nvim_get_commands({})["ThemeToGhostty"])
 		end)
 
-		it("skips the keymap when keymap is false", function()
+		it("does not register any keymap (left to the user)", function()
 			pcall(vim.keymap.del, "n", "<M-t>")
 			local mirror = fresh_require()
-			mirror.setup({ keymap = false })
+			mirror.setup()
 			local maps = vim.api.nvim_get_keymap("n")
 			for _, m in ipairs(maps) do
 				assert.are_not.equals("<M-t>", m.lhs)

@@ -42,20 +42,23 @@ vim.pack.add({ "https://github.com/piacsek/ghostty-mirror.nvim" })
   "piacsek/ghostty-mirror.nvim",
   event = "VimEnter",
   cmd = { "ThemeFromGhostty", "ThemeToGhostty" },
-  keys = { { "<M-t>", desc = "Pull theme from Ghostty" } },
 }
 ```
 
-The plugin auto-registers the `ColorScheme` autocmd, the commands, and the
-`<M-t>` keymap with sensible defaults. To override them, call `setup`:
+The plugin auto-registers the `ColorScheme` autocmd and the `ThemeFromGhostty`
+/ `ThemeToGhostty` commands. It does **not** bind any keymap — wire your own if
+you want one:
+
+```lua
+vim.keymap.set("n", "<M-t>", "<cmd>ThemeFromGhostty<cr>", { desc = "Pull theme from Ghostty" })
+```
+
+To override the defaults, call `setup`:
 
 ```lua
 require("ghostty-mirror").setup({
   themes_dir = "~/.config/ghostty/themes",          -- where themes live / are cached
   theme_file = "~/.config/ghostty/theme-current",   -- the include file the plugin writes
-  keymap = "<M-t>",                                 -- false to disable
-  user_command = "ThemeFromGhostty",                -- false to disable
-  regenerate_command = "ThemeToGhostty",            -- false to disable
   light_variant_suffix = "-light",                  -- light/dark variant routing
   generate = true,                                  -- false to require hand-made files
   reload_command = { "pkill", "-SIGUSR2", "ghostty" },
@@ -136,9 +139,9 @@ not touch your main Ghostty config or your hand-made theme files.
 
 - `:colorscheme <name>` in Neovim → Ghostty flips to the matching theme
   (hand-made file if present, otherwise generated on the fly).
-- `:ThemeFromGhostty` (or `<M-t>`) → pull Ghostty's current theme into this
-  Neovim instance. Run this in other nvim windows (across tmux panes, for
-  example) to keep them in sync without restarting them.
+- `:ThemeFromGhostty` → pull Ghostty's current theme into this Neovim instance.
+  Run this in other nvim windows (across tmux panes, for example) to keep them
+  in sync without restarting them.
 - `:ThemeToGhostty` → force-regenerate the current colorscheme's theme from
   live highlights, overwriting any cached/hand-made file. Handy after you
   tweak a colorscheme's options and want Ghostty to pick up the new colors.
