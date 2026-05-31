@@ -39,6 +39,7 @@ It must not touch the user's main Ghostty config or their hand-made theme files.
 - **Every behavior change needs a test.** Reuse the spec helpers: `with_tmp_dir`, `fresh_require` (reloads the module for a clean config), `stub_system` (captures reload invocations).
 - Gotcha: setting `vim.o.background` re-applies the colorscheme and clobbers manually-set highlight groups. Set `background` **before** `nvim_set_hl` in test setup.
 - Tests mutating global state (`vim.o.background`, `vim.g.terminal_color_*`, highlights) must restore it — other specs depend on defaults.
+- A successful iteration (specs green via `make test`) can be committed and pushed to `main`.
 
 ## Docs
 
