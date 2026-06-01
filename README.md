@@ -154,6 +154,8 @@ make test
 
 CI runs the same on stable and nightly Neovim.
 
+See the [roadmap](ROADMAP.md) for planned milestones.
+
 ## License
 
 MIT
