@@ -14,14 +14,17 @@ https://github.com/user-attachments/assets/768f8303-ab48-4e46-9e58-f9e7b1df7386
 
 ### Step 1 — wire Ghostty to read the theme file
 
-Add this to `~/.config/ghostty/config`, and remove any hardcoded
-`background`/`foreground`/`palette` lines (they override theme files):
+Add this to `~/.config/ghostty/config`:
 
 ```
 config-file = ?~/.config/ghostty/theme-current
 ```
 
-The `?` makes the include optional, so Ghostty won't error before the file exists.
+`config-file` is repeatable, so this won't clash with any `config-file` you
+already have. Put it **last** among your `config-file` lines: includes load
+after the rest of your config (and in order), so this guarantees the mirrored
+theme overrides any colors set elsewhere. The `?` makes the include optional,
+so Ghostty won't error before the file exists.
 
 ### Step 2 — install the plugin
 
