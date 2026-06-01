@@ -59,6 +59,24 @@ require("ghostty-mirror").setup({
 })
 ```
 
+## Usage
+
+- `:colorscheme <name>` in Neovim → Ghostty flips to the matching theme
+  (hand-made file if present, otherwise generated on the fly).
+- `:ThemeFromGhostty` → pull Ghostty's current theme into this Neovim instance.
+  Run this in other nvim windows (across tmux panes, for example) to keep them
+  in sync without restarting them.
+- `:ThemeToGhostty` → force-regenerate the current colorscheme's theme from
+  live highlights, overwriting any cached/hand-made file. Handy after you
+  tweak a colorscheme's options and want Ghostty to pick up the new colors.
+
+If you change colorschemes and Ghostty doesn't follow, the colorscheme likely
+doesn't expose a `g:terminal_color_*` palette and has no hand-made file at
+`~/.config/ghostty/themes/<colorscheme>`. The plugin no-ops silently in that
+case — it never writes a theme name Ghostty can't load. Drop a hand-made file
+there (the bundled skill can author one).
+
+
 ## How it works
 
 A Ghostty theme called `foo` is just a file at
@@ -93,24 +111,7 @@ file in `themes_dir` (the bundled Claude Code skill can author one for you).
 The plugin owns *only* the include file and the themes it generates — it does
 not touch your main Ghostty config or your hand-made theme files.
 
-## Usage
-
-- `:colorscheme <name>` in Neovim → Ghostty flips to the matching theme
-  (hand-made file if present, otherwise generated on the fly).
-- `:ThemeFromGhostty` → pull Ghostty's current theme into this Neovim instance.
-  Run this in other nvim windows (across tmux panes, for example) to keep them
-  in sync without restarting them.
-- `:ThemeToGhostty` → force-regenerate the current colorscheme's theme from
-  live highlights, overwriting any cached/hand-made file. Handy after you
-  tweak a colorscheme's options and want Ghostty to pick up the new colors.
-
-If you change colorschemes and Ghostty doesn't follow, the colorscheme likely
-doesn't expose a `g:terminal_color_*` palette and has no hand-made file at
-`~/.config/ghostty/themes/<colorscheme>`. The plugin no-ops silently in that
-case — it never writes a theme name Ghostty can't load. Drop a hand-made file
-there (the bundled skill can author one).
-
-## Light/dark variants
+### Light/dark variants
 
 Some Neovim colorscheme plugins (cyberdream is the canonical example) set the
 same `g:colors_name` for both light and dark variants — so the `ColorScheme`
