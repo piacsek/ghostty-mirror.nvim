@@ -42,12 +42,7 @@ vim.pack.add({ "https://github.com/piacsek/ghostty-mirror.nvim" })
 ```
 
 The plugin auto-registers the `ColorScheme` autocmd and the `ThemeFromGhostty`
-/ `ThemeToGhostty` commands. It does **not** bind any keymap — wire your own if
-you want one:
-
-```lua
-vim.keymap.set("n", "<M-t>", "<cmd>ThemeFromGhostty<cr>", { desc = "Pull theme from Ghostty" })
-```
+/ `ThemeToGhostty` commands.
 
 To override the defaults, call `setup`:
 
@@ -60,42 +55,6 @@ require("ghostty-mirror").setup({
   reload_command = { "pkill", "-SIGUSR2", "ghostty" },
 })
 ```
-
-### Step 3 — (optional) hand-made theme files
-
-Themes are generated on the fly by default, so you only need this when a
-colorscheme doesn't set `g:terminal_color_*` or you want manual control. Drop a
-file at `~/.config/ghostty/themes/<colorscheme-name>` — a hand-made file always
-wins over generation:
-
-```
-background = #1e1e2e
-foreground = #cdd6f4
-cursor-color = #f5e0dc
-palette = 0=#45475a
-palette = 1=#f38ba8
-palette = 2=#a6e3a1
-palette = 3=#f9e2af
-palette = 4=#89b4fa
-palette = 5=#f5c2e7
-palette = 6=#94e2d5
-palette = 7=#bac2de
-palette = 8=#585b70
-palette = 9=#f38ba8
-palette = 10=#a6e3a1
-palette = 11=#f9e2af
-palette = 12=#89b4fa
-palette = 13=#f5c2e7
-palette = 14=#94e2d5
-palette = 15=#a6adc8
-```
-
-To reuse a built-in Ghostty theme (`ghostty +list-themes`), the file is one
-line: `theme = <name>`.
-
-> **Tip:** with [Claude Code](https://claude.com/claude-code), this repo's
-> `.claude/skills/port-nvim-theme-to-ghostty/` skill writes these files for you
-> — add the repo with `--add-dir` and ask "port `<colorscheme>` to ghostty".
 
 ## How it works
 
@@ -111,8 +70,8 @@ the 16-color `palette`. ghostty-mirror's strategy:
 
 **Resolving the theme name** follows this precedence:
 
-1. A hand-made/cached file at `themes_dir/<name>` (honoring the
-   `-light` variant when `&background` is `"light"`) — highest fidelity.
+1. A [hand-made](docs/manual_themes.md)/cached file at `themes_dir/<name>`
+   (honoring the `-light` variant when `&background` is `"light"`) — highest fidelity.
 2. Otherwise, **generated on the fly** from Neovim's *live* highlights:
    `background`/`foreground` from `Normal`, `cursor-color` from `Cursor`,
    `selection-background` from `Visual`, and `palette = 0..15` from the
