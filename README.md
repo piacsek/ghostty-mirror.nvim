@@ -114,7 +114,7 @@ require("ghostty-mirror").setup({
     enabled = true,                                  -- off by default
     themes_dir = "~/.config/tmux/themes",            -- per-theme .conf files live / are cached here
     theme_file = "~/.config/tmux/theme-current.conf",-- pointer file the plugin writes + sources
-    bar_lighten = 0.12,                              -- status bar = Normal bg, this much lighter
+    bar_blend = 0.22,                                -- status bar = Normal bg blended this far toward the accent
     accent_ansi = 5,                                 -- ANSI slot for the bright accent (selected window)
     accent_fallback_hl = "Type",                     -- accent source when the scheme sets no palette
     divider_hl = "WinSeparator",                     -- inactive pane border color
@@ -126,10 +126,12 @@ require("ghostty-mirror").setup({
 On `:colorscheme` the plugin writes `set -g *-style` lines to
 `themes_dir/<name>.conf`, points `theme_file` at it, and runs `tmux source-file`
 to apply it to the running server. The opinion: the **status bar** is the
-theme's background a little lighter; the **selected window** and **active pane
-divider** use a bright accent — the scheme's ANSI slot 5 when it sets its own
-palette, else its `Type` highlight; the **inactive divider** uses `WinSeparator`.
-All highlight-derived, so it follows any colorscheme.
+theme's background blended toward the accent (so it stays in-hue, not greyed);
+the **selected window** and **active pane divider** use a bright accent — the
+scheme's ANSI slot 5 when it sets its own palette, else its `Type` highlight,
+with the selected-window text picked by contrast (light on a dark accent, dark
+on a light one); the **inactive divider** uses `WinSeparator`. All
+highlight-derived, so it follows any colorscheme.
 
 **Two caveats for your `tmux.conf`:**
 

@@ -18,7 +18,7 @@ local M = {}
 ---@field theme_file string Pointer file tmux sources; the plugin writes `source-file <themes_dir>/<name>.conf` here. Defaults to ~/.config/tmux/theme-current.conf.
 ---@field generate boolean Generate a tmux theme from live highlights when no hand-made file exists. Defaults to true.
 ---@field reload_command string[]|nil Command to apply the theme to the running tmux server. nil uses `tmux source-file <theme_file>`.
----@field bar_lighten number How much lighter than Normal's background the status bar is, 0..1. Defaults to 0.12.
+---@field bar_blend number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
 ---@field accent_ansi integer ANSI palette slot (0..15) used for the bright accent (selected window, active divider) when the scheme owns a full palette. Defaults to 5 (magenta).
 ---@field accent_fallback_hl string Highlight group whose fg is used for the accent when the palette isn't owned/complete. Defaults to "Type".
 ---@field divider_hl string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
@@ -36,7 +36,7 @@ local defaults = {
 		theme_file = vim.fn.expand("~/.config/tmux/theme-current.conf"),
 		generate = true,
 		reload_command = nil,
-		bar_lighten = 0.12,
+		bar_blend = 0.22,
 		accent_ansi = 5,
 		accent_fallback_hl = "Type",
 		divider_hl = "WinSeparator",
@@ -65,18 +65,34 @@ local function hl(name)
 	return vim.api.nvim_get_hl(0, { name = name, link = false })
 end
 
----Blend a "#rrggbb" color toward white by t (0..1): 0 leaves it unchanged, 1
----returns white. Used to derive a surface that's the theme background "a little
----lighter" for the tmux status bar.
----@param color string # "#rrggbb"
+---Channels of a "#rrggbb" color.
+---@param color string
+---@return integer, integer, integer
+local function rgb(color)
+	return tonumber(color:sub(2, 3), 16), tonumber(color:sub(4, 5), 16), tonumber(color:sub(6, 7), 16)
+end
+
+---Blend color `a` toward color `b` by t (0..1): 0 returns `a`, 1 returns `b`.
+---@param a string # "#rrggbb"
+---@param b string # "#rrggbb"
 ---@param t number
 ---@return string
-local function lighten(color, t)
-	local function mix(c) return math.floor(c + (255 - c) * t + 0.5) end
-	local r = tonumber(color:sub(2, 3), 16)
-	local g = tonumber(color:sub(4, 5), 16)
-	local b = tonumber(color:sub(6, 7), 16)
-	return string.format("#%02x%02x%02x", mix(r), mix(g), mix(b))
+local function blend(a, b, t)
+	local ar, ag, ab = rgb(a)
+	local br, bg, bb = rgb(b)
+	local function mix(x, y) return math.floor(x + (y - x) * t + 0.5) end
+	return string.format("#%02x%02x%02x", mix(ar, br), mix(ag, bg), mix(ab, bb))
+end
+
+---Return whichever of `light`/`dark` reads better on `color`, by perceived
+---luminance — so text on the accent stays legible whatever hue the accent is.
+---@param color string
+---@param light string
+---@param dark string
+---@return string
+local function readable_on(color, light, dark)
+	local r, g, b = rgb(color)
+	return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5 and light or dark
 end
 
 ---Snapshot the live terminal palette (g:terminal_color_0..15).
@@ -181,7 +197,6 @@ function M.generate_tmux(colorscheme)
 	if not bg or not fg then return nil end
 
 	local cfg = M.config.tmux
-	local bar = lighten(bg, cfg.bar_lighten)
 
 	-- The accent can't be inferred from the background, so it's opinionated: the
 	-- scheme's own ANSI slot when it owns a full palette (never a stale/inherited
@@ -193,18 +208,23 @@ function M.generate_tmux(colorscheme)
 	end
 	accent = accent or hex(hl(cfg.accent_fallback_hl).fg) or fg
 
+	-- The status bar is the background nudged toward the accent (not toward
+	-- white) so it stays in-hue and saturated. Selected-window text takes
+	-- whichever of fg/bg reads on the accent.
+	local bar = blend(bg, accent, cfg.bar_blend)
+	local accent_fg = readable_on(accent, fg, bg)
 	local divider = hex(hl(cfg.divider_hl).fg) or accent
 
 	return {
 		generated_marker .. " from nvim colorscheme: " .. colorscheme,
 		('set -g status-style "bg=%s,fg=%s"'):format(bar, fg),
 		('set -g window-status-style "bg=%s,fg=%s"'):format(bar, fg),
-		('set -g window-status-current-style "bg=%s,fg=%s"'):format(accent, bg),
+		('set -g window-status-current-style "bg=%s,fg=%s"'):format(accent, accent_fg),
 		('set -g pane-active-border-style "fg=%s"'):format(accent),
 		('set -g pane-border-style "fg=%s"'):format(divider),
 		('set -g message-style "bg=%s,fg=%s"'):format(bar, fg),
 		('set -g message-command-style "bg=%s,fg=%s"'):format(bar, fg),
-		('set -g mode-style "bg=%s,fg=%s"'):format(accent, bg),
+		('set -g mode-style "bg=%s,fg=%s"'):format(accent, accent_fg),
 		('set -g clock-mode-colour "%s"'):format(accent),
 	}
 end
