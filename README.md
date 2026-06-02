@@ -7,7 +7,7 @@ Mirror Neovim's colorscheme into [Ghostty](https://ghostty.org). When you run
 `:colorscheme foo` in Neovim, Ghostty's terminal theme flips to match — across
 every open window, instantly.
 
-https://github.com/user-attachments/assets/9f887e6b-4fa6-4a63-8522-3da6e0435879
+https://github.com/user-attachments/assets/edb22f4a-2b3b-4704-9dae-88302277ea6e
 
 ## Installation
 
