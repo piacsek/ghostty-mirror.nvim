@@ -23,6 +23,25 @@ local function stub_system()
 	return calls, function() vim.system = original end
 end
 
+---Set a full terminal palette plus Normal/Cursor/Visual highlights so generation
+---has everything it needs, and return after restoring the palette.
+local function with_palette(fn)
+	local saved = {}
+	for i = 0, 15 do
+		saved[i] = vim.g["terminal_color_" .. i]
+		vim.g["terminal_color_" .. i] = string.format("#%02x0000", i)
+	end
+	vim.o.background = "dark"
+	vim.api.nvim_set_hl(0, "Normal", { fg = 0xcdd6f4, bg = 0x1e1e2e })
+	vim.api.nvim_set_hl(0, "Cursor", { bg = 0xf5e0dc })
+	vim.api.nvim_set_hl(0, "Visual", { bg = 0x45475a })
+	local ok, err = pcall(fn)
+	for i = 0, 15 do
+		vim.g["terminal_color_" .. i] = saved[i]
+	end
+	if not ok then error(err) end
+end
+
 describe("ghostty-mirror", function()
 	describe("resolve", function()
 		it("returns the colorscheme name when a matching theme file exists", function()
@@ -110,6 +129,57 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("also mirrors to tmux when tmux.enabled", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local g_themes, t_themes = dir .. "/g", dir .. "/t"
+					vim.fn.mkdir(g_themes, "p")
+					vim.fn.mkdir(t_themes, "p")
+					local calls, restore = stub_system()
+					local mirror = fresh_require()
+					mirror.setup({
+						themes_dir = g_themes,
+						theme_file = dir .. "/g-current",
+						reload_command = { "echo", "ghostty" },
+						tmux = {
+							enabled = true,
+							themes_dir = t_themes,
+							theme_file = dir .. "/t-current.conf",
+							reload_command = { "echo", "tmux" },
+						},
+					})
+					mirror.push("mytheme")
+					restore()
+
+					assert.equals(1, vim.fn.filereadable(t_themes .. "/mytheme.conf"))
+					assert.equals(2, #calls) -- both the ghostty and tmux reloads fired
+				end)
+			end)
+		end)
+
+		it("does not touch tmux when tmux.enabled is false", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local g_themes, t_themes = dir .. "/g", dir .. "/t"
+					vim.fn.mkdir(g_themes, "p")
+					vim.fn.mkdir(t_themes, "p")
+					local calls, restore = stub_system()
+					local mirror = fresh_require()
+					mirror.setup({
+						themes_dir = g_themes,
+						theme_file = dir .. "/g-current",
+						reload_command = { "echo" },
+						tmux = { themes_dir = t_themes, theme_file = dir .. "/t.conf" },
+					})
+					mirror.push("mytheme")
+					restore()
+
+					assert.equals(0, vim.fn.filereadable(t_themes .. "/mytheme.conf"))
+					assert.equals(1, #calls) -- only the ghostty reload
+				end)
+			end)
+		end)
+
 		it("is a no-op when no theme file matches and generation is off", function()
 			with_tmp_dir(function(dir)
 				local themes_dir = dir .. "/themes"
@@ -129,25 +199,6 @@ describe("ghostty-mirror", function()
 	end)
 
 	describe("generate", function()
-		---Set a full terminal palette plus Normal/Cursor/Visual highlights so
-		---generation has everything it needs, and return a cleanup function.
-		local function with_palette(fn)
-			local saved = {}
-			for i = 0, 15 do
-				saved[i] = vim.g["terminal_color_" .. i]
-				vim.g["terminal_color_" .. i] = string.format("#%02x0000", i)
-			end
-			vim.o.background = "dark"
-			vim.api.nvim_set_hl(0, "Normal", { fg = 0xcdd6f4, bg = 0x1e1e2e })
-			vim.api.nvim_set_hl(0, "Cursor", { bg = 0xf5e0dc })
-			vim.api.nvim_set_hl(0, "Visual", { bg = 0x45475a })
-			local ok, err = pcall(fn)
-			for i = 0, 15 do
-				vim.g["terminal_color_" .. i] = saved[i]
-			end
-			if not ok then error(err) end
-		end
-
 		it("builds background, foreground and a 16-color palette from live highlights", function()
 			with_palette(function()
 				local mirror = fresh_require()
@@ -237,6 +288,148 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("generate_tmux", function()
+		it("emits status, window and pane-border styles anchored on Normal", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true } })
+				local lines = mirror.generate_tmux("mytheme")
+				assert.is_not_nil(lines)
+				local joined = table.concat(lines, "\n")
+				assert.is_truthy(joined:find("set %-g status%-style"))
+				assert.is_truthy(joined:find("set %-g window%-status%-current%-style"))
+				assert.is_truthy(joined:find("set %-g pane%-active%-border%-style"))
+				assert.is_truthy(joined:find("set %-g pane%-border%-style"))
+			end)
+		end)
+
+		it("returns nil when the colorscheme has no Normal fg/bg", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Normal", {})
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true } })
+				assert.is_nil(mirror.generate_tmux("mytheme"))
+			end)
+		end)
+
+		it("makes the status bar a lighter shade of Normal's background", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, bar_lighten = 0.12 } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				local bar = joined:match('status%-style "bg=(#%x%x%x%x%x%x)')
+				assert.is_not_nil(bar)
+				assert.are_not.equals("#1e1e2e", bar)
+				assert.is_true(tonumber(bar:sub(2, 3), 16) > 0x1e)
+			end)
+		end)
+
+		it("uses the ANSI accent slot for the selected window when the palette is owned", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, accent_ansi = 5 } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				-- with_palette sets slot 5 to "#050000"
+				assert.is_truthy(joined:find('window%-status%-current%-style "bg=#050000'))
+				assert.is_truthy(joined:find('pane%-active%-border%-style "fg=#050000'))
+			end)
+		end)
+
+		it("falls back to the accent highlight group when the palette is incomplete", function()
+			with_palette(function()
+				vim.g.terminal_color_5 = nil
+				local saved = vim.api.nvim_get_hl(0, { name = "Type" })
+				vim.api.nvim_set_hl(0, "Type", { fg = 0xff5faf })
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, accent_ansi = 5, accent_fallback_hl = "Type" } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				vim.api.nvim_set_hl(0, "Type", saved)
+				assert.is_truthy(joined:find('window%-status%-current%-style "bg=#ff5faf'))
+			end)
+		end)
+	end)
+
+	describe("resolve_tmux", function()
+		it("generates and caches a <name>.conf when none exists", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local mirror = fresh_require()
+					mirror.setup({ tmux = { enabled = true, themes_dir = dir } })
+					assert.equals("mytheme", mirror.resolve_tmux("mytheme"))
+					assert.equals(1, vim.fn.filereadable(dir .. "/mytheme.conf"))
+				end)
+			end)
+		end)
+
+		it("prefers a hand-made .conf over generating", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					vim.fn.writefile({ 'set -g status-style "bg=#abcdef"' }, dir .. "/mytheme.conf")
+					local mirror = fresh_require()
+					mirror.setup({ tmux = { enabled = true, themes_dir = dir } })
+					assert.equals("mytheme", mirror.resolve_tmux("mytheme"))
+					assert.same({ 'set -g status-style "bg=#abcdef"' }, vim.fn.readfile(dir .. "/mytheme.conf"))
+				end)
+			end)
+		end)
+
+		it("caches the light variant under <name>-light.conf when background is light", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local mirror = fresh_require()
+					mirror.setup({ tmux = { enabled = true, themes_dir = dir } })
+					vim.o.background = "light"
+					assert.equals("mytheme-light", mirror.resolve_tmux("mytheme"))
+					assert.equals(1, vim.fn.filereadable(dir .. "/mytheme-light.conf"))
+					vim.o.background = "dark"
+				end)
+			end)
+		end)
+	end)
+
+	describe("push_tmux", function()
+		it("writes a source-file pointer and invokes 'tmux source-file' by default", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/themes"
+					local theme_file = dir .. "/theme-current.conf"
+					vim.fn.mkdir(themes_dir, "p")
+					local calls, restore = stub_system()
+					local mirror = fresh_require()
+					mirror.setup({ tmux = { enabled = true, themes_dir = themes_dir, theme_file = theme_file } })
+					mirror.push_tmux("mytheme")
+					restore()
+
+					assert.same({ 'source-file "' .. themes_dir .. '/mytheme.conf"' }, vim.fn.readfile(theme_file))
+					assert.equals(1, #calls)
+					assert.same({ "tmux", "source-file", theme_file }, calls[1].cmd)
+				end)
+			end)
+		end)
+
+		it("honors a custom tmux reload_command", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/themes"
+					vim.fn.mkdir(themes_dir, "p")
+					local calls, restore = stub_system()
+					local mirror = fresh_require()
+					mirror.setup({
+						tmux = {
+							enabled = true,
+							themes_dir = themes_dir,
+							theme_file = dir .. "/tc.conf",
+							reload_command = { "echo", "reloaded" },
+						},
+					})
+					mirror.push_tmux("mytheme")
+					restore()
+					assert.same({ "echo", "reloaded" }, calls[1].cmd)
+				end)
+			end)
+		end)
+	end)
+
 	describe("clear_cache", function()
 		it("deletes generated theme files but leaves hand-made ones", function()
 			with_tmp_dir(function(themes_dir)
@@ -253,6 +446,27 @@ describe("ghostty-mirror", function()
 				assert.equals(0, vim.fn.filereadable(themes_dir .. "/gen"))
 				assert.equals(1, vim.fn.filereadable(themes_dir .. "/handmade"))
 				assert.same({ "gen" }, cleared)
+			end)
+		end)
+
+		it("also clears generated tmux theme files, leaving hand-made ones", function()
+			with_tmp_dir(function(dir)
+				local g, t = dir .. "/g", dir .. "/t"
+				vim.fn.mkdir(g, "p")
+				vim.fn.mkdir(t, "p")
+				vim.fn.writefile(
+					{ "# Generated by ghostty-mirror.nvim from nvim colorscheme: gen", 'set -g status-style "bg=#000000"' },
+					t .. "/gen.conf"
+				)
+				vim.fn.writefile({ 'set -g status-style "bg=#abcdef"' }, t .. "/hand.conf")
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = g, tmux = { enabled = true, themes_dir = t } })
+
+				local cleared = mirror.clear_cache()
+
+				assert.equals(0, vim.fn.filereadable(t .. "/gen.conf"))
+				assert.equals(1, vim.fn.filereadable(t .. "/hand.conf"))
+				assert.is_true(vim.tbl_contains(cleared, "gen.conf"))
 			end)
 		end)
 	end)
@@ -318,6 +532,12 @@ describe("ghostty-mirror", function()
 			local mirror = fresh_require()
 			mirror.setup()
 			assert.is_not_nil(vim.api.nvim_get_commands({})["ThemeToGhostty"])
+		end)
+
+		it("creates the ThemeToTmux command", function()
+			local mirror = fresh_require()
+			mirror.setup()
+			assert.is_not_nil(vim.api.nvim_get_commands({})["ThemeToTmux"])
 		end)
 
 		it("creates the ThemeCacheClear command", function()

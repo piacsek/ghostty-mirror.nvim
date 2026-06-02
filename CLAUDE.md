@@ -12,6 +12,9 @@ signals a reload. `:ThemeFromGhostty` goes the other way.
 
 Public API surface (keep stable): `M.setup`, `M.resolve`, `M.push`, `M.generate`,
 `M.write_generated`, `M.read_current`, `M.pull`, `M.clear_cache`, and `M.config`.
+tmux mirroring (opt-in via `config.tmux.enabled`) adds siblings: `M.generate_tmux`,
+`M.resolve_tmux`, `M.write_tmux_generated`, `M.push_tmux` — structured exactly like
+their Ghostty counterparts (same precedence, same `palette_owned` gate for the accent).
 
 ### How a theme is resolved (precedence)
 

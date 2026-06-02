@@ -56,6 +56,7 @@ require("ghostty-mirror").setup({
   light_variant_suffix = "-light",                  -- light/dark variant routing
   generate = true,                                  -- false to require hand-made files
   reload_command = { "pkill", "-SIGUSR2", "ghostty" },
+  tmux = { enabled = false },                        -- opt-in tmux statusline mirroring (see below)
 })
 ```
 
@@ -69,6 +70,8 @@ require("ghostty-mirror").setup({
 - `:ThemeToGhostty` → force-regenerate the current colorscheme's theme from
   live highlights, overwriting any cached/hand-made file. Handy after you
   tweak a colorscheme's options and want Ghostty to pick up the new colors.
+- `:ThemeToTmux` → force-regenerate the current colorscheme's tmux theme (when
+  tmux mirroring is enabled). The tmux analog of `:ThemeToGhostty`.
 - `:ThemeCacheClear` → delete every *generated* theme file from `themes_dir`,
   leaving hand-made ones untouched. Use it when a cached theme has gone stale
   (e.g. you changed a colorscheme's colors); the next `:colorscheme` regenerates
@@ -100,6 +103,49 @@ vim.opt.guicursor = "n-v-c-sm:block-Cursor/lCursor,"
 This requires the colorscheme to define a `Cursor` highlight, and it governs
 the cursor only while Neovim is focused — the shell-prompt cursor still comes
 from Ghostty's config.
+
+### tmux
+
+Opt in to mirror the colorscheme into tmux's statusline too:
+
+```lua
+require("ghostty-mirror").setup({
+  tmux = {
+    enabled = true,                                  -- off by default
+    themes_dir = "~/.config/tmux/themes",            -- per-theme .conf files live / are cached here
+    theme_file = "~/.config/tmux/theme-current.conf",-- pointer file the plugin writes + sources
+    bar_lighten = 0.12,                              -- status bar = Normal bg, this much lighter
+    accent_ansi = 5,                                 -- ANSI slot for the bright accent (selected window)
+    accent_fallback_hl = "Type",                     -- accent source when the scheme sets no palette
+    divider_hl = "WinSeparator",                     -- inactive pane border color
+    -- reload_command = { "tmux", "source-file", "<theme_file>" },  -- default; override to taste
+  },
+})
+```
+
+On `:colorscheme` the plugin writes `set -g *-style` lines to
+`themes_dir/<name>.conf`, points `theme_file` at it, and runs `tmux source-file`
+to apply it to the running server. The opinion: the **status bar** is the
+theme's background a little lighter; the **selected window** and **active pane
+divider** use a bright accent — the scheme's ANSI slot 5 when it sets its own
+palette, else its `Type` highlight; the **inactive divider** uses `WinSeparator`.
+All highlight-derived, so it follows any colorscheme.
+
+**Two caveats for your `tmux.conf`:**
+
+1. tmux applies colors via `*-style` options, so your `window-status-format` /
+   `window-status-current-format` must **not** hardcode colors inline (`#[bg=…]`
+   overrides the style). Keep them layout-only, e.g. `" #I #W "`.
+2. To survive a tmux *server* restart, source the pointer once at startup,
+   *after* your own theme block:
+   ```tmux
+   if-shell "test -f ~/.config/tmux/theme-current.conf" \
+     "source-file ~/.config/tmux/theme-current.conf"
+   ```
+
+To hand-author a theme instead of generating one, drop a
+`themes_dir/<name>.conf` — it always wins over generation, exactly like Ghostty
+([guide](docs/manual_tmux_themes.md)).
 
 
 ## How it works

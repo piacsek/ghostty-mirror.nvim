@@ -10,6 +10,18 @@ local M = {}
 ---@field light_variant_suffix string Suffix used when looking for light-mode variant files (e.g. "cyberdream-light"). Set to "" or false to disable.
 ---@field generate boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
 ---@field reload_command string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
+---@field tmux GhosttyMirrorTmuxConfig Opt-in tmux statusline mirroring. Disabled by default.
+
+---@class GhosttyMirrorTmuxConfig
+---@field enabled boolean Mirror the colorscheme into tmux's statusline on :colorscheme. Defaults to false (opt-in).
+---@field themes_dir string Directory tmux theme files live in / are cached to. Defaults to ~/.config/tmux/themes.
+---@field theme_file string Pointer file tmux sources; the plugin writes `source-file <themes_dir>/<name>.conf` here. Defaults to ~/.config/tmux/theme-current.conf.
+---@field generate boolean Generate a tmux theme from live highlights when no hand-made file exists. Defaults to true.
+---@field reload_command string[]|nil Command to apply the theme to the running tmux server. nil uses `tmux source-file <theme_file>`.
+---@field bar_lighten number How much lighter than Normal's background the status bar is, 0..1. Defaults to 0.12.
+---@field accent_ansi integer ANSI palette slot (0..15) used for the bright accent (selected window, active divider) when the scheme owns a full palette. Defaults to 5 (magenta).
+---@field accent_fallback_hl string Highlight group whose fg is used for the accent when the palette isn't owned/complete. Defaults to "Type".
+---@field divider_hl string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
 
 ---@type GhosttyMirrorConfig
 local defaults = {
@@ -18,6 +30,17 @@ local defaults = {
 	light_variant_suffix = "-light",
 	generate = true,
 	reload_command = { "pkill", "-SIGUSR2", "ghostty" },
+	tmux = {
+		enabled = false,
+		themes_dir = vim.fn.expand("~/.config/tmux/themes"),
+		theme_file = vim.fn.expand("~/.config/tmux/theme-current.conf"),
+		generate = true,
+		reload_command = nil,
+		bar_lighten = 0.12,
+		accent_ansi = 5,
+		accent_fallback_hl = "Type",
+		divider_hl = "WinSeparator",
+	},
 }
 
 ---@type GhosttyMirrorConfig
@@ -40,6 +63,20 @@ end
 ---@return table
 local function hl(name)
 	return vim.api.nvim_get_hl(0, { name = name, link = false })
+end
+
+---Blend a "#rrggbb" color toward white by t (0..1): 0 leaves it unchanged, 1
+---returns white. Used to derive a surface that's the theme background "a little
+---lighter" for the tmux status bar.
+---@param color string # "#rrggbb"
+---@param t number
+---@return string
+local function lighten(color, t)
+	local function mix(c) return math.floor(c + (255 - c) * t + 0.5) end
+	local r = tonumber(color:sub(2, 3), 16)
+	local g = tonumber(color:sub(4, 5), 16)
+	local b = tonumber(color:sub(6, 7), 16)
+	return string.format("#%02x%02x%02x", mix(r), mix(g), mix(b))
 end
 
 ---Snapshot the live terminal palette (g:terminal_color_0..15).
@@ -131,6 +168,47 @@ function M.generate(colorscheme)
 	return lines
 end
 
+---Build the lines of a tmux theme file (a list of `set -g *-style` commands)
+---from Neovim's live highlights. Returns nil only when Normal has no fg/bg to
+---anchor the theme. The status bar is the background "a little lighter"; the
+---bright accent (selected window + active pane border) comes from the scheme's
+---ANSI slot when it owns a full palette, else from a syntax highlight group.
+---@param colorscheme string
+---@return string[]|nil
+function M.generate_tmux(colorscheme)
+	local normal = hl("Normal")
+	local bg, fg = hex(normal.bg), hex(normal.fg)
+	if not bg or not fg then return nil end
+
+	local cfg = M.config.tmux
+	local bar = lighten(bg, cfg.bar_lighten)
+
+	-- The accent can't be inferred from the background, so it's opinionated: the
+	-- scheme's own ANSI slot when it owns a full palette (never a stale/inherited
+	-- one), otherwise a syntax highlight group that always belongs to the scheme.
+	local palette = snapshot_palette()
+	local accent
+	if palette_owned and palette_complete(palette) then
+		accent = palette[cfg.accent_ansi]
+	end
+	accent = accent or hex(hl(cfg.accent_fallback_hl).fg) or fg
+
+	local divider = hex(hl(cfg.divider_hl).fg) or accent
+
+	return {
+		generated_marker .. " from nvim colorscheme: " .. colorscheme,
+		('set -g status-style "bg=%s,fg=%s"'):format(bar, fg),
+		('set -g window-status-style "bg=%s,fg=%s"'):format(bar, fg),
+		('set -g window-status-current-style "bg=%s,fg=%s"'):format(accent, bg),
+		('set -g pane-active-border-style "fg=%s"'):format(accent),
+		('set -g pane-border-style "fg=%s"'):format(divider),
+		('set -g message-style "bg=%s,fg=%s"'):format(bar, fg),
+		('set -g message-command-style "bg=%s,fg=%s"'):format(bar, fg),
+		('set -g mode-style "bg=%s,fg=%s"'):format(accent, bg),
+		('set -g clock-mode-colour "%s"'):format(accent),
+	}
+end
+
 ---Generate a theme from live highlights and write it to themes_dir.
 ---@param colorscheme string
 ---@return string|nil # the theme name written, or nil if generation wasn't possible
@@ -141,6 +219,45 @@ function M.write_generated(colorscheme)
 	vim.fn.mkdir(M.config.themes_dir, "p")
 	vim.fn.writefile(lines, M.config.themes_dir .. "/" .. name)
 	return name
+end
+
+---Generate a tmux theme from live highlights and write it to tmux.themes_dir as
+---`<name>.conf`.
+---@param colorscheme string
+---@return string|nil # the theme name written, or nil if generation wasn't possible
+function M.write_tmux_generated(colorscheme)
+	local lines = M.generate_tmux(colorscheme)
+	if not lines then return nil end
+	local name = target_name(colorscheme)
+	vim.fn.mkdir(M.config.tmux.themes_dir, "p")
+	vim.fn.writefile(lines, M.config.tmux.themes_dir .. "/" .. name .. ".conf")
+	return name
+end
+
+---Resolve the tmux theme name for a colorscheme. Same precedence as `resolve`:
+---a hand-made `<name>.conf` wins (honoring the light variant suffix), otherwise
+---one is generated from live highlights and cached.
+---@param colorscheme string
+---@return string|nil
+function M.resolve_tmux(colorscheme)
+	local cfg = M.config.tmux
+	local suffix = M.config.light_variant_suffix
+	local name = colorscheme
+	if
+		suffix
+		and suffix ~= ""
+		and vim.o.background == "light"
+		and vim.uv.fs_stat(cfg.themes_dir .. "/" .. name .. suffix .. ".conf")
+	then
+		name = name .. suffix
+	end
+	if vim.uv.fs_stat(cfg.themes_dir .. "/" .. name .. ".conf") then
+		return name
+	end
+	if cfg.generate then
+		return M.write_tmux_generated(colorscheme)
+	end
+	return nil
 end
 
 ---Resolve the Ghostty theme name to write for a given Neovim colorscheme.
@@ -185,16 +302,38 @@ function M.push(colorscheme, opts)
 	if not name then return end
 	vim.fn.writefile({ "theme = " .. name }, M.config.theme_file)
 	vim.system(M.config.reload_command, { detach = true })
+	if M.config.tmux.enabled then M.push_tmux(colorscheme, opts) end
 	return name
 end
 
----Delete every generated theme file from themes_dir, leaving hand-made files
----untouched. A file is plugin-owned when its first line is the generated marker,
----so stale caches can be cleared without risking the user's own themes.
----@return string[] # names of the files deleted
-function M.clear_cache()
-	local dir = M.config.themes_dir
+---Resolve the tmux theme for a colorscheme, point tmux.theme_file at it, and
+---tell the running tmux server to source it. No-op (no reload) when nothing
+---resolves. Fails silently if no tmux server is running.
+---@param colorscheme string
+---@param opts? { force?: boolean }
+---@return string|nil # the theme name written, or nil when nothing was written
+function M.push_tmux(colorscheme, opts)
+	local cfg = M.config.tmux
+	local name
+	if opts and opts.force then
+		palette_owned = true
+		name = M.write_tmux_generated(colorscheme)
+	else
+		name = M.resolve_tmux(colorscheme)
+	end
+	if not name then return end
+	vim.fn.writefile({ 'source-file "' .. cfg.themes_dir .. "/" .. name .. '.conf"' }, cfg.theme_file)
+	vim.system(cfg.reload_command or { "tmux", "source-file", cfg.theme_file }, { detach = true })
+	return name
+end
+
+---Delete every generated file (first line is the generated marker) from a dir,
+---leaving hand-made files untouched. Missing dirs are skipped.
+---@param dir string
+---@return string[]
+local function clear_generated_in(dir)
 	local cleared = {}
+	if not (dir and vim.uv.fs_stat(dir)) then return cleared end
 	for name, type in vim.fs.dir(dir) do
 		if type == "file" then
 			local first = vim.fn.readfile(dir .. "/" .. name, "", 1)[1]
@@ -203,6 +342,19 @@ function M.clear_cache()
 				table.insert(cleared, name)
 			end
 		end
+	end
+	return cleared
+end
+
+---Delete every generated theme file from themes_dir (and the tmux themes_dir
+---when tmux mirroring is enabled), leaving hand-made files untouched. A file is
+---plugin-owned when its first line is the generated marker, so stale caches can
+---be cleared without risking the user's own themes.
+---@return string[] # names of the files deleted
+function M.clear_cache()
+	local cleared = clear_generated_in(M.config.themes_dir)
+	if M.config.tmux.enabled then
+		vim.list_extend(cleared, clear_generated_in(M.config.tmux.themes_dir))
 	end
 	return cleared
 end
@@ -259,6 +411,12 @@ function M.setup(opts)
 		desc = "Regenerate the current colorscheme's Ghostty theme from live highlights",
 	})
 
+	vim.api.nvim_create_user_command("ThemeToTmux", function()
+		M.push_tmux(vim.g.colors_name or "", { force = true })
+	end, {
+		desc = "Regenerate the current colorscheme's tmux theme from live highlights",
+	})
+
 	vim.api.nvim_create_user_command("ThemeCacheClear", function()
 		local cleared = M.clear_cache()
 		vim.notify(
@@ -267,7 +425,7 @@ function M.setup(opts)
 			vim.log.levels.INFO
 		)
 	end, {
-		desc = "Delete every generated Ghostty theme file (hand-made themes are left untouched)",
+		desc = "Delete every generated Ghostty/tmux theme file (hand-made themes are left untouched)",
 	})
 end
 
