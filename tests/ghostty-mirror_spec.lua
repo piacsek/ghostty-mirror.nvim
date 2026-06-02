@@ -359,6 +359,20 @@ describe("ghostty-mirror", function()
 				assert.is_truthy(joined2:find('window%-status%-current%-style "bg=#eeeeee,fg=#1e1e2e'))
 			end)
 		end)
+
+		it("on a light background deepens the bar toward the foreground and keeps pill text legible", function()
+			vim.o.background = "light"
+			vim.api.nvim_set_hl(0, "Normal", { fg = 0x000000, bg = 0xe4e4e4 })
+			vim.api.nvim_set_hl(0, "Type", { fg = 0x2e8b57 }) -- mid-tone accent
+			local mirror = fresh_require()
+			mirror.setup({ tmux = { enabled = true, bar_blend = 0.25 } })
+			local joined = table.concat(mirror.generate_tmux("lighttheme"), "\n")
+			-- bar deepens toward fg #000 (not toward the accent): blend(#e4e4e4,#000,0.25)
+			assert.equals("#ababab", joined:match('status%-style "bg=(#%x%x%x%x%x%x)'))
+			-- pill text is the lighter of fg/bg (legible on the mid accent), not the dark fg
+			assert.is_truthy(joined:find('window%-status%-current%-style "bg=#2e8b57,fg=#e4e4e4'))
+			vim.o.background = "dark"
+		end)
 	end)
 
 	describe("resolve_tmux", function()

@@ -125,7 +125,9 @@ require("ghostty-mirror").setup({
 On `:colorscheme` the plugin writes `set -g *-style` lines to
 `themes_dir/<name>.conf`, points `theme_file` at it, and runs `tmux source-file`
 to apply it to the running server. The opinion: the **status bar** is the
-theme's background blended toward the accent (so it stays in-hue, not greyed);
+theme's background blended toward the accent (so it stays in-hue, not greyed) —
+on a *light* theme it blends toward the foreground instead, since a light
+background barely moves toward a mid-tone accent and washes out;
 the **selected window** and **active pane divider** use a bright accent — the
 fg of a syntax highlight group (`Type` by default), so it harmonizes with each
 scheme's own hue rather than forcing one color on every theme; text on it is

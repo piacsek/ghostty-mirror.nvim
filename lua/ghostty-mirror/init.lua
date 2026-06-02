@@ -70,6 +70,14 @@ local function rgb(color)
 	return tonumber(color:sub(2, 3), 16), tonumber(color:sub(4, 5), 16), tonumber(color:sub(6, 7), 16)
 end
 
+---Perceived luminance of a "#rrggbb" color, 0 (black) .. 1 (white).
+---@param color string
+---@return number
+local function luminance(color)
+	local r, g, b = rgb(color)
+	return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+end
+
 ---Blend color `a` toward color `b` by t (0..1): 0 returns `a`, 1 returns `b`.
 ---@param a string # "#rrggbb"
 ---@param b string # "#rrggbb"
@@ -82,15 +90,18 @@ local function blend(a, b, t)
 	return string.format("#%02x%02x%02x", mix(ar, br), mix(ag, bg), mix(ab, bb))
 end
 
----Return whichever of `light`/`dark` reads better on `color`, by perceived
----luminance — so text on the accent stays legible whatever hue the accent is.
+---Return whichever of two candidates reads better on `color`: the lighter one
+---on a dark color, the darker one on a light color. Picks by actual luminance
+---(not by assuming which candidate is light), so it's correct on light themes
+---where Normal's fg is the dark one.
 ---@param color string
----@param light string
----@param dark string
+---@param x string
+---@param y string
 ---@return string
-local function readable_on(color, light, dark)
-	local r, g, b = rgb(color)
-	return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5 and light or dark
+local function readable_on(color, x, y)
+	local lighter, darker = x, y
+	if luminance(y) > luminance(x) then lighter, darker = y, x end
+	return luminance(color) < 0.5 and lighter or darker
 end
 
 ---Snapshot the live terminal palette (g:terminal_color_0..15).
@@ -202,10 +213,12 @@ function M.generate_tmux(colorscheme)
 	-- theme, blue on a blue one — instead of forcing one hue on every theme.
 	local accent = hex(hl(cfg.accent_hl).fg) or fg
 
-	-- The status bar is the background nudged toward the accent (not toward
-	-- white) so it stays in-hue and saturated. Selected-window text takes
-	-- whichever of fg/bg reads on the accent.
-	local bar = blend(bg, accent, cfg.bar_blend)
+	-- The status bar is the background nudged for contrast: on a dark theme,
+	-- toward the accent (stays in-hue and saturated); on a light theme, toward
+	-- the foreground, since a light bg blended toward a mid-tone accent barely
+	-- moves and washes out. Selected-window text takes whichever of fg/bg reads
+	-- on the accent.
+	local bar = blend(bg, luminance(bg) > 0.5 and fg or accent, cfg.bar_blend)
 	local accent_fg = readable_on(accent, fg, bg)
 	local divider = hex(hl(cfg.divider_hl).fg) or accent
 
