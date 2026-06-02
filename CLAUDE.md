@@ -70,4 +70,5 @@ not a mirror issue.
 - `README.md` is user-facing and authoritative. Any config option, command, or behavior change must be reflected there (setup block, Usage, How it works).
 - **Word choice:** prefer "Considerations" over "Caveats" — "caveat" reads as a gotcha/warning, which is off-putting for a plugin. Same for headings and inline ("two considerations", not "two caveats").
 - **No emojis** anywhere — README, release notes, commit messages, headings. Plain text only.
+- **Conciseness beats verbosity.** Keep docs to the point and expose what matters; don't restate the same idea in two places, and cut step-lists that prose covers. Every load-bearing fact stays, but say it once.
 - `.claude/skills/port-nvim-theme-to-ghostty/` is the agent skill for hand-authoring high-fidelity theme files when generation isn't good enough.
