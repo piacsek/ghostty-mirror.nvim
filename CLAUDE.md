@@ -14,7 +14,9 @@ Public API surface (keep stable): `M.setup`, `M.resolve`, `M.push`, `M.generate`
 `M.write_generated`, `M.read_current`, `M.pull`, `M.clear_cache`, and `M.config`.
 tmux mirroring (opt-in via `config.tmux.enabled`) adds siblings: `M.generate_tmux`,
 `M.resolve_tmux`, `M.write_tmux_generated`, `M.push_tmux` — structured exactly like
-their Ghostty counterparts (same precedence, same `palette_owned` gate for the accent).
+their Ghostty counterparts (same precedence). The tmux accent is the fg of a
+highlight group (`accent_hl`, default `Type`) so it harmonizes with each scheme's
+hue; the bar blends toward it and the selected-window text is contrast-picked.
 
 ### How a theme is resolved (precedence)
 

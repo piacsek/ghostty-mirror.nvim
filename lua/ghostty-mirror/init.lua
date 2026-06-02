@@ -19,8 +19,7 @@ local M = {}
 ---@field generate boolean Generate a tmux theme from live highlights when no hand-made file exists. Defaults to true.
 ---@field reload_command string[]|nil Command to apply the theme to the running tmux server. nil uses `tmux source-file <theme_file>`.
 ---@field bar_blend number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
----@field accent_ansi integer ANSI palette slot (0..15) used for the bright accent (selected window, active divider) when the scheme owns a full palette. Defaults to 5 (magenta).
----@field accent_fallback_hl string Highlight group whose fg is used for the accent when the palette isn't owned/complete. Defaults to "Type".
+---@field accent_hl string Highlight group whose fg is the bright accent (selected window, active divider, status-right). Sourcing it from a highlight lets the accent harmonize with each scheme's own hue. Defaults to "Type".
 ---@field divider_hl string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
 
 ---@type GhosttyMirrorConfig
@@ -37,8 +36,7 @@ local defaults = {
 		generate = true,
 		reload_command = nil,
 		bar_blend = 0.22,
-		accent_ansi = 5,
-		accent_fallback_hl = "Type",
+		accent_hl = "Type",
 		divider_hl = "WinSeparator",
 	},
 }
@@ -198,15 +196,11 @@ function M.generate_tmux(colorscheme)
 
 	local cfg = M.config.tmux
 
-	-- The accent can't be inferred from the background, so it's opinionated: the
-	-- scheme's own ANSI slot when it owns a full palette (never a stale/inherited
-	-- one), otherwise a syntax highlight group that always belongs to the scheme.
-	local palette = snapshot_palette()
-	local accent
-	if palette_owned and palette_complete(palette) then
-		accent = palette[cfg.accent_ansi]
-	end
-	accent = accent or hex(hl(cfg.accent_fallback_hl).fg) or fg
+	-- The accent can't be inferred from the background, so it's opinionated: a
+	-- syntax highlight group's fg. Sourcing it from a highlight (not a fixed ANSI
+	-- slot) lets it harmonize with the scheme's own hue — magenta-ish on a purple
+	-- theme, blue on a blue one — instead of forcing one hue on every theme.
+	local accent = hex(hl(cfg.accent_hl).fg) or fg
 
 	-- The status bar is the background nudged toward the accent (not toward
 	-- white) so it stays in-hue and saturated. Selected-window text takes
