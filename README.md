@@ -129,9 +129,11 @@ to apply it to the running server. The opinion: the **status bar** is the
 theme's background blended toward the accent (so it stays in-hue, not greyed);
 the **selected window** and **active pane divider** use a bright accent — the
 scheme's ANSI slot 5 when it sets its own palette, else its `Type` highlight,
-with the selected-window text picked by contrast (light on a dark accent, dark
-on a light one); the **inactive divider** uses `WinSeparator`. All
-highlight-derived, so it follows any colorscheme.
+with text picked by contrast (light on a dark accent, dark on a light one).
+`status-right-style` is set to the same accent, so an accent-pill right segment
+follows the theme — keep your `status-right` content color-free. The **inactive
+divider** uses `WinSeparator`. All highlight-derived, so it follows any
+colorscheme.
 
 **Two caveats for your `tmux.conf`:**
 

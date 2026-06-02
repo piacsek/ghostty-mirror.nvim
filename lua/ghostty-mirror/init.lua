@@ -218,6 +218,7 @@ function M.generate_tmux(colorscheme)
 	return {
 		generated_marker .. " from nvim colorscheme: " .. colorscheme,
 		('set -g status-style "bg=%s,fg=%s"'):format(bar, fg),
+		('set -g status-right-style "bg=%s,fg=%s"'):format(accent, accent_fg),
 		('set -g window-status-style "bg=%s,fg=%s"'):format(bar, fg),
 		('set -g window-status-current-style "bg=%s,fg=%s"'):format(accent, accent_fg),
 		('set -g pane-active-border-style "fg=%s"'):format(accent),

@@ -312,6 +312,16 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("styles status-right with the accent so accent-pill segments follow the theme", function()
+			with_palette(function()
+				vim.g.terminal_color_5 = "#d700ff"
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, accent_ansi = 5 } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.is_truthy(joined:find('set %-g status%-right%-style "bg=#d700ff,fg=#cdd6f4'))
+			end)
+		end)
+
 		it("blends the status bar background from Normal toward the accent", function()
 			with_palette(function()
 				vim.g.terminal_color_5 = "#ff00ff" -- bright magenta accent
