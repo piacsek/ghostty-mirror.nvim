@@ -131,11 +131,13 @@ background barely moves toward a mid-tone accent and washes out;
 the **selected window** and **active pane divider** use a bright accent — the
 fg of a syntax highlight group (`Type` by default), so it harmonizes with each
 scheme's own hue rather than forcing one color on every theme; text on it is
-picked by contrast (light on a dark accent, dark on a light one).
-`status-right-style` is set to the same accent, so an accent-pill right segment
-follows the theme — keep your `status-right` content color-free. The **inactive
-divider** uses `WinSeparator`. All highlight-derived, so it follows any
-colorscheme.
+picked by contrast (light on a dark accent, dark on a light one). Every base
+segment — including `status-left`, which tmux otherwise leaves at the theme
+default — gets the bar color, so the bar reads as one piece. On a **dark** theme
+`status-right` is also an accent pill (keep its content color-free); on a
+**light** theme the whole bar is a single color and the accent appears only on
+the current window. The **inactive divider** uses `WinSeparator`. All
+highlight-derived, so it follows any colorscheme.
 
 **Two considerations for your `tmux.conf`:**
 

@@ -334,6 +334,32 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("styles status-left to match the bar so there's no unstyled default segment", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				local bar_bg = joined:match('status%-style "bg=(#%x%x%x%x%x%x)')
+				assert.is_truthy(joined:find('set -g status-left-style "bg=' .. bar_bg, 1, true))
+			end)
+		end)
+
+		it("on a light background keeps the bar one color (accent only on the current window)", function()
+			vim.o.background = "light"
+			vim.api.nvim_set_hl(0, "Normal", { fg = 0x000000, bg = 0xe4e4e4 })
+			vim.api.nvim_set_hl(0, "Type", { fg = 0x2e8b57 })
+			local mirror = fresh_require()
+			mirror.setup({ tmux = { enabled = true, bar_blend = 0.25 } })
+			local joined = table.concat(mirror.generate_tmux("lighttheme"), "\n")
+			local bar_bg = joined:match('status%-style "bg=(#%x%x%x%x%x%x)') -- #ababab
+			-- status-left and status-right both match the bar — no accent pill on a light theme
+			assert.is_truthy(joined:find('set -g status-left-style "bg=' .. bar_bg, 1, true))
+			assert.is_truthy(joined:find('set -g status-right-style "bg=' .. bar_bg, 1, true))
+			-- the current window is the only accent
+			assert.is_truthy(joined:find('set -g window-status-current-style "bg=#2e8b57', 1, true))
+			vim.o.background = "dark"
+		end)
+
 		it("blends the status bar background from Normal toward the accent", function()
 			with_palette(function()
 				vim.api.nvim_set_hl(0, "Type", { fg = 0xff00ff }) -- bright magenta accent

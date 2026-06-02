@@ -218,21 +218,31 @@ function M.generate_tmux(colorscheme)
 	-- the foreground, since a light bg blended toward a mid-tone accent barely
 	-- moves and washes out. Selected-window text takes whichever of fg/bg reads
 	-- on the accent.
-	local bar = blend(bg, luminance(bg) > 0.5 and fg or accent, cfg.bar_blend)
+	local light = luminance(bg) > 0.5
+	local bar = blend(bg, light and fg or accent, cfg.bar_blend)
 	local accent_fg = readable_on(accent, fg, bg)
 	local divider = hex(hl(cfg.divider_hl).fg) or accent
 
+	local bar_pair = ("bg=%s,fg=%s"):format(bar, fg)
+	local accent_pair = ("bg=%s,fg=%s"):format(accent, accent_fg)
+	-- Style every base segment (incl. status-left, which tmux leaves at the
+	-- theme default otherwise) with the bar color so the bar reads as one piece.
+	-- On a light theme the accent appears only on the current window; on a dark
+	-- theme status-right stays an accent pill.
+	local right_pair = light and bar_pair or accent_pair
+
 	return {
 		generated_marker .. " from nvim colorscheme: " .. colorscheme,
-		('set -g status-style "bg=%s,fg=%s"'):format(bar, fg),
-		('set -g status-right-style "bg=%s,fg=%s"'):format(accent, accent_fg),
-		('set -g window-status-style "bg=%s,fg=%s"'):format(bar, fg),
-		('set -g window-status-current-style "bg=%s,fg=%s"'):format(accent, accent_fg),
+		('set -g status-style "%s"'):format(bar_pair),
+		('set -g status-left-style "%s"'):format(bar_pair),
+		('set -g status-right-style "%s"'):format(right_pair),
+		('set -g window-status-style "%s"'):format(bar_pair),
+		('set -g window-status-current-style "%s"'):format(accent_pair),
 		('set -g pane-active-border-style "fg=%s"'):format(accent),
 		('set -g pane-border-style "fg=%s"'):format(divider),
-		('set -g message-style "bg=%s,fg=%s"'):format(bar, fg),
-		('set -g message-command-style "bg=%s,fg=%s"'):format(bar, fg),
-		('set -g mode-style "bg=%s,fg=%s"'):format(accent, accent_fg),
+		('set -g message-style "%s"'):format(bar_pair),
+		('set -g message-command-style "%s"'):format(bar_pair),
+		('set -g mode-style "%s"'):format(accent_pair),
 		('set -g clock-mode-colour "%s"'):format(accent),
 	}
 end
