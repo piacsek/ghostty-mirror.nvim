@@ -27,6 +27,23 @@ hue; the bar blends toward it and the selected-window text is contrast-picked.
 The plugin owns **only** the include file (`theme_file`) and the themes it generates.
 It must not touch the user's main Ghostty config or their hand-made theme files.
 
+The `ColorScheme` autocmd is **debounced** (`config.debounce_ms`, default 150) — a
+colorscheme picker's live preview fires the event per previewed scheme, so we
+coalesce and `M.push` only once the scheme settles. `:ThemeToGhostty`/`:ThemeToTmux`
+call `M.push` directly, so they stay immediate.
+
+### Debugging a "stuck" / desynced theme
+
+Almost always the *environment*, not the plugin (which faithfully mirrors the last
+settled `:colorscheme`). Suspect, in order: a colorscheme **picker** spraying
+transient previews (the debounce is the fix — check it's not set to 0); a config
+that **reads `theme_file` at startup** to pick the colorscheme (input+output =
+feedback loop); and **multiple nvim instances** sharing one `theme_file`
+(last-writer-wins by design — that's how `:ThemeFromGhostty` syncs windows).
+Recovery: kill all nvims, pre-set `theme_file` (+ tmux pointer) to the wanted
+theme, restart. `colors_name == nil` means a colorscheme load aborted upstream —
+not a mirror issue.
+
 ## Conventions
 
 - **Indentation:** tabs (see existing files / `.editorconfig` if added).
