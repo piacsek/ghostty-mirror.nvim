@@ -207,6 +207,13 @@ when it's `"light"` and a `<name>-light` file exists, that's used instead
   `init.lua` before plugins load fails — wrap it in `pcall` and retry on
   `VimEnter`. Normal use is unaffected.
 
+- **A light scheme can leave `&background` stuck.** Some schemes (catppuccin-latte)
+  set `background=light` and never reset it, so an `&background`-adaptive scheme
+  loaded afterwards (the built-in `default`) renders its *light* variant — which
+  the plugin faithfully mirrors. If `default` looks washed-out after a light
+  scheme, that's the cause. Reset `&background` on `ColorSchemePre`, or set it to
+  match the loaded scheme's Normal-bg luminance on `ColorScheme`.
+
 ## Development
 
 The plugin has a plenary-based test suite. With plenary installed via your
