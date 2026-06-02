@@ -320,4 +320,99 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 	end)
+
+	describe("integration: palette ownership", function()
+		---Set a full terminal palette as if left behind by a previous colorscheme,
+		---returning a function that restores the prior values.
+		local function with_stale_palette()
+			local saved = {}
+			for i = 0, 15 do
+				saved[i] = vim.g["terminal_color_" .. i]
+				vim.g["terminal_color_" .. i] = string.format("#%02x0000", i)
+			end
+			return function()
+				for i = 0, 15 do
+					vim.g["terminal_color_" .. i] = saved[i]
+				end
+			end
+		end
+
+		it("skips generation when the colorscheme leaves the terminal palette unchanged", function()
+			with_tmp_dir(function(dir)
+				local themes_dir = dir .. "/themes"
+				local theme_file = dir .. "/theme-current"
+				vim.fn.mkdir(themes_dir, "p")
+
+				local restore_palette = with_stale_palette()
+				local calls, restore_sys = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = themes_dir,
+					theme_file = theme_file,
+					reload_command = { "echo" },
+				})
+				-- `default` sets a complete Normal but never touches terminal_color_*,
+				-- so the palette stays exactly as the previous scheme left it.
+				vim.cmd.colorscheme("default")
+				restore_sys()
+				restore_palette()
+
+				assert.equals(0, vim.fn.filereadable(theme_file))
+				assert.equals(0, vim.fn.filereadable(themes_dir .. "/default"))
+				assert.equals(0, #calls)
+			end)
+		end)
+
+		it("still generates when the colorscheme sets its own palette", function()
+			with_tmp_dir(function(dir)
+				local themes_dir = dir .. "/themes"
+				local theme_file = dir .. "/theme-current"
+				vim.fn.mkdir(themes_dir, "p")
+
+				local restore_palette = with_stale_palette()
+				local calls, restore_sys = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = themes_dir,
+					theme_file = theme_file,
+					reload_command = { "echo" },
+				})
+				-- `habamax` installs its own full terminal palette, replacing the
+				-- stale one, so the new palette is genuinely the current scheme's.
+				vim.cmd.colorscheme("habamax")
+				restore_sys()
+				restore_palette()
+
+				assert.same({ "theme = habamax" }, vim.fn.readfile(theme_file))
+				assert.equals(1, vim.fn.filereadable(themes_dir .. "/habamax"))
+				assert.equals(1, #calls)
+			end)
+		end)
+
+		it("force regenerates from the live palette even after an unowned colorscheme", function()
+			with_tmp_dir(function(dir)
+				local themes_dir = dir .. "/themes"
+				local theme_file = dir .. "/theme-current"
+				vim.fn.mkdir(themes_dir, "p")
+
+				local restore_palette = with_stale_palette()
+				local _, restore_sys = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = themes_dir,
+					theme_file = theme_file,
+					reload_command = { "echo" },
+				})
+				-- `default` leaves the palette stale → not owned → mirror skipped it.
+				vim.cmd.colorscheme("default")
+				-- ThemeToGhostty forces a regenerate; force trusts the live palette.
+				mirror.push("forced", { force = true })
+				restore_sys()
+				restore_palette()
+
+				assert.same({ "theme = forced" }, vim.fn.readfile(theme_file))
+				assert.equals(1, vim.fn.filereadable(themes_dir .. "/forced"))
+			end)
+		end)
+	end)
 end)

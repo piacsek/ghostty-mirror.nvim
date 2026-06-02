@@ -38,6 +38,35 @@ local function hl(name)
 	return vim.api.nvim_get_hl(0, { name = name, link = false })
 end
 
+---Snapshot the live terminal palette (g:terminal_color_0..15).
+---@return table<integer, string|nil>
+local function snapshot_palette()
+	local p = {}
+	for i = 0, 15 do
+		p[i] = vim.g["terminal_color_" .. i]
+	end
+	return p
+end
+
+---Whether two palette snapshots hold identical values across all 16 slots.
+---@param a table<integer, string|nil>
+---@param b table<integer, string|nil>
+---@return boolean
+local function palettes_equal(a, b)
+	for i = 0, 15 do
+		if a[i] ~= b[i] then return false end
+	end
+	return true
+end
+
+-- g:terminal_color_* is global and sticky: it survives :colorscheme changes,
+-- so a scheme that defines no palette of its own inherits whatever the previous
+-- scheme left behind. We snapshot it on ColorSchemePre and only trust it when
+-- the new scheme actually changed it, so we never mirror a palette that doesn't
+-- belong to the current colorscheme.
+local prev_palette
+local palette_owned = true
+
 ---Name we'd write a generated theme under, honoring the light variant suffix
 ---when &background is "light" so light/dark caches stay separate.
 ---@param colorscheme string
@@ -57,11 +86,10 @@ end
 ---@param colorscheme string
 ---@return string[]|nil
 function M.generate(colorscheme)
-	local palette = {}
+	if not palette_owned then return nil end
+	local palette = snapshot_palette()
 	for i = 0, 15 do
-		local c = vim.g["terminal_color_" .. i]
-		if type(c) ~= "string" or c == "" then return nil end
-		palette[i] = c
+		if type(palette[i]) ~= "string" or palette[i] == "" then return nil end
 	end
 
 	local normal = hl("Normal")
@@ -133,6 +161,8 @@ end
 function M.push(colorscheme, opts)
 	local name
 	if opts and opts.force then
+		-- An explicit force trusts whatever palette is live right now.
+		palette_owned = true
 		name = M.write_generated(colorscheme)
 	else
 		name = M.resolve(colorscheme)
@@ -168,9 +198,20 @@ end
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
 
+	local group = vim.api.nvim_create_augroup("ghostty-mirror", { clear = true })
+
+	vim.api.nvim_create_autocmd("ColorSchemePre", {
+		group = group,
+		callback = function() prev_palette = snapshot_palette() end,
+	})
+
 	vim.api.nvim_create_autocmd("ColorScheme", {
-		group = vim.api.nvim_create_augroup("ghostty-mirror", { clear = true }),
-		callback = function(ev) M.push(ev.match) end,
+		group = group,
+		callback = function(ev)
+			local cur = snapshot_palette()
+			palette_owned = prev_palette == nil or not palettes_equal(prev_palette, cur)
+			M.push(ev.match)
+		end,
 	})
 
 	vim.api.nvim_create_user_command("ThemeFromGhostty", M.pull, {
