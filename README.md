@@ -3,9 +3,9 @@
 <img width="200" height="200" alt="ghostty-mirror logo" src="assets/logo.png" />
 
 
-Mirror Neovim's colorscheme into [Ghostty](https://ghostty.org). When you run
-`:colorscheme foo` in Neovim, Ghostty's terminal theme flips to match — across
-every open window, instantly.
+Mirror Neovim's colorscheme into [Ghostty](https://ghostty.org) (and, optionally,
+tmux). When you run `:colorscheme foo` in Neovim, Ghostty's terminal theme flips
+to match — across every open window, instantly.
 
 https://github.com/user-attachments/assets/edb22f4a-2b3b-4704-9dae-88302277ea6e
 
