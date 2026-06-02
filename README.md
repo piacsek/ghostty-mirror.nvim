@@ -71,10 +71,11 @@ require("ghostty-mirror").setup({
   tweak a colorscheme's options and want Ghostty to pick up the new colors.
 
 If you change colorschemes and Ghostty doesn't follow, the colorscheme likely
-doesn't expose a `g:terminal_color_*` palette and has no hand-made file at
-`~/.config/ghostty/themes/<colorscheme>`. The plugin no-ops silently in that
-case — it never writes a theme name Ghostty can't load. Drop a hand-made file
-there (the bundled skill can author one).
+doesn't expose a `g:terminal_color_*` palette of its own and has no hand-made
+file at `~/.config/ghostty/themes/<colorscheme>`. The plugin no-ops in that
+case — it never writes a theme name Ghostty can't load — and prints a one-time
+hint naming the colorscheme. Drop a hand-made file there (the bundled skill can
+author one), or enable the colorscheme's terminal-colors option if it has one.
 
 
 ## How it works
@@ -103,10 +104,21 @@ the 16-color `palette`. ghostty-mirror's strategy:
    generation is skipped silently — the plugin never writes a partial,
    wrong-looking theme.
 
-Most well-maintained colorschemes (catppuccin, tokyonight, kanagawa, gruvbox,
-rose-pine, …) set `terminal_color_*`, so generation is zero-config for them.
-For ones that don't — or when you want pixel-perfect control — drop a hand-made
-file in `themes_dir` (the bundled Claude Code skill can author one for you).
+`g:terminal_color_*` is a *global, sticky* variable: it survives `:colorscheme`
+changes, so a scheme that sets no palette of its own inherits whatever the
+previous scheme left behind. To avoid caching one colorscheme's palette under
+another's name, the plugin snapshots the palette on `ColorSchemePre` and only
+trusts it when the new scheme actually changed it — otherwise generation is
+skipped. When that happens (and there's no hand-made file), it emits a one-time
+hint per colorscheme so the silent skip is discoverable. `:ThemeToGhostty`
+bypasses this and always regenerates from the live palette.
+
+Many colorschemes (tokyonight, kanagawa, gruvbox, rose-pine, …) set
+`terminal_color_*`, so generation is zero-config for them. Some don't by
+default — e.g. catppuccin only sets the palette when you enable its
+`term_colors` option. For those — or when you want pixel-perfect control — drop
+a hand-made file in `themes_dir` (the bundled Claude Code skill can author one
+for you).
 
 The plugin owns *only* the include file and the themes it generates — it does
 not touch your main Ghostty config or your hand-made theme files.

@@ -59,6 +59,16 @@ local function palettes_equal(a, b)
 	return true
 end
 
+---Whether a palette snapshot has a non-empty string in all 16 slots.
+---@param p table<integer, string|nil>
+---@return boolean
+local function palette_complete(p)
+	for i = 0, 15 do
+		if type(p[i]) ~= "string" or p[i] == "" then return false end
+	end
+	return true
+end
+
 -- g:terminal_color_* is global and sticky: it survives :colorscheme changes,
 -- so a scheme that defines no palette of its own inherits whatever the previous
 -- scheme left behind. We snapshot it on ColorSchemePre and only trust it when
@@ -66,6 +76,10 @@ end
 -- belong to the current colorscheme.
 local prev_palette
 local palette_owned = true
+
+-- Colorschemes we've already hinted lack a terminal palette, so the notify
+-- fires at most once per scheme per session.
+local notified = {}
 
 ---Name we'd write a generated theme under, honoring the light variant suffix
 ---when &background is "light" so light/dark caches stay separate.
@@ -88,9 +102,7 @@ end
 function M.generate(colorscheme)
 	if not palette_owned then return nil end
 	local palette = snapshot_palette()
-	for i = 0, 15 do
-		if type(palette[i]) ~= "string" or palette[i] == "" then return nil end
-	end
+	if not palette_complete(palette) then return nil end
 
 	local normal = hl("Normal")
 	local bg, fg = hex(normal.bg), hex(normal.fg)
@@ -158,6 +170,7 @@ end
 ---Write the resolved theme to the theme file and signal Ghostty to reload.
 ---@param colorscheme string
 ---@param opts? { force?: boolean } # force regenerates from live highlights, ignoring any existing file
+---@return string|nil # the theme name written, or nil when nothing was written
 function M.push(colorscheme, opts)
 	local name
 	if opts and opts.force then
@@ -170,6 +183,7 @@ function M.push(colorscheme, opts)
 	if not name then return end
 	vim.fn.writefile({ "theme = " .. name }, M.config.theme_file)
 	vim.system(M.config.reload_command, { detach = true })
+	return name
 end
 
 ---Read the theme name currently set in Ghostty's theme-current file.
@@ -210,7 +224,15 @@ function M.setup(opts)
 		callback = function(ev)
 			local cur = snapshot_palette()
 			palette_owned = prev_palette == nil or not palettes_equal(prev_palette, cur)
-			M.push(ev.match)
+			local name = M.push(ev.match)
+			if M.config.generate and not name and not (palette_owned and palette_complete(cur)) and not notified[ev.match] then
+				notified[ev.match] = true
+				vim.notify(
+					("ghostty-mirror: %s exposes no terminal palette; enable the colorscheme's term colors or add a theme file in %s")
+						:format(ev.match, M.config.themes_dir),
+					vim.log.levels.INFO
+				)
+			end
 		end,
 	})
 

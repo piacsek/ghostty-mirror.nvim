@@ -414,5 +414,36 @@ describe("ghostty-mirror", function()
 				assert.equals(1, vim.fn.filereadable(themes_dir .. "/forced"))
 			end)
 		end)
+
+		it("notifies once when the colorscheme exposes no terminal palette", function()
+			with_tmp_dir(function(dir)
+				local themes_dir = dir .. "/themes"
+				local theme_file = dir .. "/theme-current"
+				vim.fn.mkdir(themes_dir, "p")
+
+				local restore_palette = with_stale_palette()
+				local _, restore_sys = stub_system()
+				local notes = {}
+				local orig_notify = vim.notify
+				vim.notify = function(msg) ---@diagnostic disable-line: duplicate-set-field
+					table.insert(notes, msg)
+				end
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = themes_dir,
+					theme_file = theme_file,
+					reload_command = { "echo" },
+				})
+				-- `default` never sets a palette, so it's unowned and generation skips.
+				vim.cmd.colorscheme("default")
+				vim.cmd.colorscheme("default")
+				vim.notify = orig_notify
+				restore_sys()
+				restore_palette()
+
+				assert.equals(1, #notes)
+				assert.is_truthy(notes[1]:find("default", 1, true))
+			end)
+		end)
 	end)
 end)
