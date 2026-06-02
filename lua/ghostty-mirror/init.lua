@@ -10,6 +10,7 @@ local M = {}
 ---@field light_variant_suffix string Suffix used when looking for light-mode variant files (e.g. "cyberdream-light"). Set to "" or false to disable.
 ---@field generate boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
 ---@field reload_command string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
+---@field debounce_ms integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
 ---@field tmux GhosttyMirrorTmuxConfig Opt-in tmux statusline mirroring. Disabled by default.
 
 ---@class GhosttyMirrorTmuxConfig
@@ -29,6 +30,7 @@ local defaults = {
 	light_variant_suffix = "-light",
 	generate = true,
 	reload_command = { "pkill", "-SIGUSR2", "ghostty" },
+	debounce_ms = 150,
 	tmux = {
 		enabled = false,
 		themes_dir = vim.fn.expand("~/.config/tmux/themes"),
@@ -142,6 +144,33 @@ end
 -- belong to the current colorscheme.
 local prev_palette
 local palette_owned = true
+
+-- Pending debounced push; a colorscheme picker's live preview fires a
+-- ColorScheme per previewed scheme, so we coalesce them and only mirror once
+-- the scheme settles (see config.debounce_ms).
+local push_timer
+
+---Mirror `colorscheme`, debounced by config.debounce_ms. A new change cancels
+---the pending one, so only the settled scheme is pushed. 0 pushes immediately.
+---@param colorscheme string
+local function schedule_push(colorscheme)
+	local delay = tonumber(M.config.debounce_ms) or 0
+	if delay <= 0 then
+		M.push(colorscheme)
+		return
+	end
+	if push_timer then
+		push_timer:stop()
+		push_timer:close()
+	end
+	local timer = vim.uv.new_timer()
+	push_timer = timer
+	timer:start(delay, 0, vim.schedule_wrap(function()
+		timer:close()
+		if push_timer == timer then push_timer = nil end
+		M.push(colorscheme)
+	end))
+end
 
 ---Name we'd write a generated theme under, honoring the light variant suffix
 ---when &background is "light" so light/dark caches stay separate.
@@ -435,7 +464,7 @@ function M.setup(opts)
 		callback = function(ev)
 			local cur = snapshot_palette()
 			palette_owned = prev_palette == nil or not palettes_equal(prev_palette, cur)
-			M.push(ev.match)
+			schedule_push(ev.match)
 		end,
 	})
 

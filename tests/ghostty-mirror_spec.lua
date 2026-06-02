@@ -624,11 +624,41 @@ describe("ghostty-mirror", function()
 					themes_dir = themes_dir,
 					theme_file = theme_file,
 					reload_command = { "echo" },
+					debounce_ms = 0,
 				})
 				vim.cmd.colorscheme("elflord")
 				restore()
 
 				assert.same({ "theme = elflord" }, vim.fn.readfile(theme_file))
+			end)
+		end)
+
+		it("debounces rapid colorscheme changes into a single push", function()
+			with_tmp_dir(function(dir)
+				local themes_dir = dir .. "/themes"
+				local theme_file = dir .. "/theme-current"
+				vim.fn.mkdir(themes_dir, "p")
+				for _, n in ipairs({ "elflord", "habamax", "default" }) do
+					vim.fn.writefile({ "" }, themes_dir .. "/" .. n)
+				end
+
+				local calls, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = themes_dir,
+					theme_file = theme_file,
+					reload_command = { "echo" },
+					debounce_ms = 40,
+				})
+				vim.cmd.colorscheme("elflord")
+				vim.cmd.colorscheme("habamax")
+				vim.cmd.colorscheme("default")
+				assert.equals(0, #calls) -- nothing pushed synchronously while debouncing
+				vim.wait(400, function() return #calls > 0 end)
+				restore()
+
+				assert.equals(1, #calls) -- the three rapid switches coalesced into one push
+				assert.same({ "theme = default" }, vim.fn.readfile(theme_file))
 			end)
 		end)
 	end)
@@ -662,6 +692,7 @@ describe("ghostty-mirror", function()
 					themes_dir = themes_dir,
 					theme_file = theme_file,
 					reload_command = { "echo" },
+					debounce_ms = 0,
 				})
 				-- `default` sets a complete Normal but never touches terminal_color_*,
 				-- so the palette stays exactly as the previous scheme left it. We still
@@ -691,6 +722,7 @@ describe("ghostty-mirror", function()
 					themes_dir = themes_dir,
 					theme_file = theme_file,
 					reload_command = { "echo" },
+					debounce_ms = 0,
 				})
 				-- `habamax` installs its own full terminal palette, replacing the
 				-- stale one, so the new palette is genuinely the current scheme's.
@@ -717,6 +749,7 @@ describe("ghostty-mirror", function()
 					themes_dir = themes_dir,
 					theme_file = theme_file,
 					reload_command = { "echo" },
+					debounce_ms = 0,
 				})
 				-- `default` leaves the palette stale → unowned → mirrored without a palette.
 				vim.cmd.colorscheme("default")

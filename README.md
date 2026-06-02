@@ -56,6 +56,7 @@ require("ghostty-mirror").setup({
   light_variant_suffix = "-light",                  -- light/dark variant routing
   generate = true,                                  -- false to require hand-made files
   reload_command = { "pkill", "-SIGUSR2", "ghostty" },
+  debounce_ms = 150,                                 -- coalesce rapid switches (e.g. a picker's live preview); 0 = immediate
   tmux = { enabled = false },                        -- opt-in tmux statusline mirroring (see below)
 })
 ```
@@ -167,6 +168,12 @@ the 16-color `palette`. ghostty-mirror's strategy:
    in its config (`~/.config/ghostty/theme-current` by default).
 2. It signals Ghostty (`SIGUSR2`) to reload its config.
 3. Ghostty re-reads the include and applies the new theme.
+
+`ColorScheme` is **debounced** (`debounce_ms`, default 150): a colorscheme
+picker's live preview fires the event for every scheme you scroll past, so the
+mirror waits for the selection to settle and pushes once — no reload-per-preview
+churn, and transient previews never get written or cached. (`:ThemeToGhostty` /
+`:ThemeToTmux` bypass the debounce and act immediately.)
 
 **Resolving the theme name** follows this precedence:
 
