@@ -11,7 +11,7 @@ signals a reload. `:ThemeFromGhostty` goes the other way.
 - `tests/ghostty-mirror_spec.lua` — plenary/busted spec. `tests/minimal_init.lua` bootstraps the runtimepath + plenary.
 
 Public API surface (keep stable): `M.setup`, `M.resolve`, `M.push`, `M.generate`,
-`M.write_generated`, `M.read_current`, `M.pull`, and `M.config`.
+`M.write_generated`, `M.read_current`, `M.pull`, `M.clear_cache`, and `M.config`.
 
 ### How a theme is resolved (precedence)
 
