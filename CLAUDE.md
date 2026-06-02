@@ -49,4 +49,5 @@ It must not touch the user's main Ghostty config or their hand-made theme files.
 ## Docs
 
 - `README.md` is user-facing and authoritative. Any config option, command, or behavior change must be reflected there (setup block, Usage, How it works).
+- **Word choice:** prefer "Considerations" over "Caveats" — "caveat" reads as a gotcha/warning, which is off-putting for a plugin. Same for headings and inline ("two considerations", not "two caveats").
 - `.claude/skills/port-nvim-theme-to-ghostty/` is the agent skill for hand-authoring high-fidelity theme files when generation isn't good enough.

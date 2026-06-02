@@ -135,7 +135,7 @@ follows the theme — keep your `status-right` content color-free. The **inactiv
 divider** uses `WinSeparator`. All highlight-derived, so it follows any
 colorscheme.
 
-**Two caveats for your `tmux.conf`:**
+**Two considerations for your `tmux.conf`:**
 
 1. tmux applies colors via `*-style` options, so your `window-status-format` /
    `window-status-current-format` must **not** hardcode colors inline (`#[bg=…]`
@@ -213,7 +213,7 @@ instead. Default suffix is `-light`.
 So you can ship both `themes/cyberdream` and `themes/cyberdream-light` and
 the right one will load automatically.
 
-## Caveats
+## Considerations
 
 - **Initial load.** The plugin doesn't fire on Neovim's startup colorscheme;
   opening a new nvim window won't reflow every Ghostty window. If you want the
