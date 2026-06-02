@@ -186,7 +186,7 @@ when it's `"light"` and a `<name>-light` file exists, that's used instead
 (`light_variant_suffix`, default `-light`). Ship both `themes/cyberdream` and
 `themes/cyberdream-light` and the right one loads automatically.
 
-## Considerations
+## Troubleshooting
 
 - **Initial load.** The plugin doesn't fire on Neovim's startup colorscheme;
   opening a new nvim window won't reflow every Ghostty window. If you want the
@@ -213,6 +213,39 @@ when it's `"light"` and a `<name>-light` file exists, that's used instead
   the plugin faithfully mirrors. If `default` looks washed-out after a light
   scheme, that's the cause. Reset `&background` on `ColorSchemePre`, or set it to
   match the loaded scheme's Normal-bg luminance on `ColorScheme`.
+
+  <details>
+  <summary>Autocmds that keep <code>&background</code> honest</summary>
+
+  ```lua
+  -- Baseline &background to dark before a scheme loads, then sync it to the
+  -- loaded scheme's actual Normal-bg luminance. Both writes are guarded, since
+  -- writing &background re-applies the scheme and re-fires these events.
+  local group = vim.api.nvim_create_augroup("background-honest", { clear = true })
+  local adjusting = false
+  local function set_bg(want)
+  	if vim.o.background ~= want then
+  		adjusting = true
+  		vim.o.background = want
+  		adjusting = false
+  	end
+  end
+  vim.api.nvim_create_autocmd("ColorSchemePre", {
+  	group = group,
+  	callback = function() if not adjusting then set_bg("dark") end end,
+  })
+  vim.api.nvim_create_autocmd("ColorScheme", {
+  	group = group,
+  	callback = function()
+  		if adjusting then return end
+  		local n = vim.api.nvim_get_hl(0, { name = "Normal" })
+  		if type(n.bg) ~= "number" then return end
+  		local r, g, b = math.floor(n.bg / 65536) % 256, math.floor(n.bg / 256) % 256, n.bg % 256
+  		set_bg((0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5 and "light" or "dark")
+  	end,
+  })
+  ```
+  </details>
 
 ## Development
 
