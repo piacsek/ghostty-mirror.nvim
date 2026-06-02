@@ -81,10 +81,6 @@ end
 local prev_palette
 local palette_owned = true
 
--- Colorschemes we've already hinted lack a terminal palette, so the notify
--- fires at most once per scheme per session.
-local notified = {}
-
 ---Name we'd write a generated theme under, honoring the light variant suffix
 ---when &background is "light" so light/dark caches stay separate.
 ---@param colorscheme string
@@ -98,16 +94,15 @@ local function target_name(colorscheme)
 end
 
 ---Build the lines of a Ghostty theme file from Neovim's *live* highlight state
----(the currently loaded colorscheme). Returns nil when the colorscheme doesn't
----provide a full 16-color terminal palette (terminal_color_0..15) or lacks a
----Normal fg/bg — we never emit a partial, wrong-looking theme.
+---(the currently loaded colorscheme). Returns nil only when the colorscheme has
+---no Normal fg/bg to anchor the theme. The highlight-derived colors (background,
+---foreground, cursor, selection) are always the scheme's own, so they're mirrored
+---unconditionally; the 16-color palette is only appended when this scheme owns a
+---full one (see `palette_owned`), since terminal_color_* is global and sticky and
+---a scheme that sets none of its own would otherwise mirror an inherited palette.
 ---@param colorscheme string
 ---@return string[]|nil
 function M.generate(colorscheme)
-	if not palette_owned then return nil end
-	local palette = snapshot_palette()
-	if not palette_complete(palette) then return nil end
-
 	local normal = hl("Normal")
 	local bg, fg = hex(normal.bg), hex(normal.fg)
 	if not bg or not fg then return nil end
@@ -126,9 +121,12 @@ function M.generate(colorscheme)
 	local sel = hex(visual.bg)
 	if sel then table.insert(lines, "selection-background = " .. sel) end
 
-	table.insert(lines, "")
-	for i = 0, 15 do
-		table.insert(lines, "palette = " .. i .. "=" .. palette[i])
+	local palette = snapshot_palette()
+	if palette_owned and palette_complete(palette) then
+		table.insert(lines, "")
+		for i = 0, 15 do
+			table.insert(lines, "palette = " .. i .. "=" .. palette[i])
+		end
 	end
 	return lines
 end
@@ -247,15 +245,7 @@ function M.setup(opts)
 		callback = function(ev)
 			local cur = snapshot_palette()
 			palette_owned = prev_palette == nil or not palettes_equal(prev_palette, cur)
-			local name = M.push(ev.match)
-			if M.config.generate and not name and not (palette_owned and palette_complete(cur)) and not notified[ev.match] then
-				notified[ev.match] = true
-				vim.notify(
-					("ghostty-mirror: %s exposes no terminal palette; enable the colorscheme's term colors or add a theme file in %s")
-						:format(ev.match, M.config.themes_dir),
-					vim.log.levels.INFO
-				)
-			end
+			M.push(ev.match)
 		end,
 	})
 
@@ -271,7 +261,6 @@ function M.setup(opts)
 
 	vim.api.nvim_create_user_command("ThemeCacheClear", function()
 		local cleared = M.clear_cache()
-		notified = {}
 		vim.notify(
 			("ghostty-mirror: cleared %d generated theme%s")
 				:format(#cleared, #cleared == 1 and "" or "s"),

@@ -17,7 +17,7 @@ Public API surface (keep stable): `M.setup`, `M.resolve`, `M.push`, `M.generate`
 
 1. Hand-made/cached file at `themes_dir/<name>` (honoring `light_variant_suffix` when `&background == "light"`) — wins.
 2. Generated on the fly from live highlights when `config.generate` is true: `Normal` → background/foreground, `Cursor` → cursor-color, `Visual` → selection-background, `g:terminal_color_0..15` → palette. Cached to `themes_dir/<name>`.
-3. If the colorscheme exposes no full `terminal_color_*` palette (or no `Normal` fg/bg), generation is skipped and `resolve` returns `nil` — never emit a partial theme.
+3. The highlight-derived colors (`Normal`/`Cursor`/`Visual`) are always the colorscheme's own, so they're mirrored unconditionally. The 16-color palette is appended **only** when the scheme actually owns a full `terminal_color_*` palette (it changed it on this `:colorscheme`) — `terminal_color_*` is global and sticky, so a scheme that sets none of its own would otherwise mirror an inherited palette. Generation returns `nil` (and nothing is mirrored) only when `Normal` has no fg/bg to anchor the theme.
 
 The plugin owns **only** the include file (`theme_file`) and the themes it generates.
 It must not touch the user's main Ghostty config or their hand-made theme files.

@@ -164,9 +164,23 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
-		it("returns nil when the terminal palette is incomplete", function()
+		it("omits the palette but still emits colors when the palette is incomplete", function()
 			with_palette(function()
 				vim.g.terminal_color_7 = nil
+				local mirror = fresh_require()
+				mirror.setup({ generate = true })
+				local lines = mirror.generate("mytheme")
+				assert.is_not_nil(lines)
+				local joined = table.concat(lines, "\n")
+				assert.is_truthy(joined:find("background = #1e1e2e", 1, true))
+				assert.is_truthy(joined:find("cursor%-color = #f5e0dc"))
+				assert.is_nil(joined:find("palette = ", 1, true))
+			end)
+		end)
+
+		it("returns nil when the colorscheme has no Normal fg/bg to anchor the theme", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Normal", {})
 				local mirror = fresh_require()
 				mirror.setup({ generate = true })
 				assert.is_nil(mirror.generate("mytheme"))
@@ -363,7 +377,7 @@ describe("ghostty-mirror", function()
 			end
 		end
 
-		it("skips generation when the colorscheme leaves the terminal palette unchanged", function()
+		it("mirrors colors without a palette when the colorscheme leaves the terminal palette unchanged", function()
 			with_tmp_dir(function(dir)
 				local themes_dir = dir .. "/themes"
 				local theme_file = dir .. "/theme-current"
@@ -378,14 +392,17 @@ describe("ghostty-mirror", function()
 					reload_command = { "echo" },
 				})
 				-- `default` sets a complete Normal but never touches terminal_color_*,
-				-- so the palette stays exactly as the previous scheme left it.
+				-- so the palette stays exactly as the previous scheme left it. We still
+				-- mirror its highlight-derived colors, just without a (stale) palette.
 				vim.cmd.colorscheme("default")
 				restore_sys()
 				restore_palette()
 
-				assert.equals(0, vim.fn.filereadable(theme_file))
-				assert.equals(0, vim.fn.filereadable(themes_dir .. "/default"))
-				assert.equals(0, #calls)
+				assert.same({ "theme = default" }, vim.fn.readfile(theme_file))
+				local generated = table.concat(vim.fn.readfile(themes_dir .. "/default"), "\n")
+				assert.is_truthy(generated:find("background = ", 1, true))
+				assert.is_nil(generated:find("palette = ", 1, true))
+				assert.equals(1, #calls)
 			end)
 		end)
 
@@ -415,7 +432,7 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
-		it("force regenerates from the live palette even after an unowned colorscheme", function()
+		it("force regenerates with the full live palette even after an unowned colorscheme", function()
 			with_tmp_dir(function(dir)
 				local themes_dir = dir .. "/themes"
 				local theme_file = dir .. "/theme-current"
@@ -429,7 +446,7 @@ describe("ghostty-mirror", function()
 					theme_file = theme_file,
 					reload_command = { "echo" },
 				})
-				-- `default` leaves the palette stale → not owned → mirror skipped it.
+				-- `default` leaves the palette stale → unowned → mirrored without a palette.
 				vim.cmd.colorscheme("default")
 				-- ThemeToGhostty forces a regenerate; force trusts the live palette.
 				mirror.push("forced", { force = true })
@@ -437,38 +454,8 @@ describe("ghostty-mirror", function()
 				restore_palette()
 
 				assert.same({ "theme = forced" }, vim.fn.readfile(theme_file))
-				assert.equals(1, vim.fn.filereadable(themes_dir .. "/forced"))
-			end)
-		end)
-
-		it("notifies once when the colorscheme exposes no terminal palette", function()
-			with_tmp_dir(function(dir)
-				local themes_dir = dir .. "/themes"
-				local theme_file = dir .. "/theme-current"
-				vim.fn.mkdir(themes_dir, "p")
-
-				local restore_palette = with_stale_palette()
-				local _, restore_sys = stub_system()
-				local notes = {}
-				local orig_notify = vim.notify
-				vim.notify = function(msg) ---@diagnostic disable-line: duplicate-set-field
-					table.insert(notes, msg)
-				end
-				local mirror = fresh_require()
-				mirror.setup({
-					themes_dir = themes_dir,
-					theme_file = theme_file,
-					reload_command = { "echo" },
-				})
-				-- `default` never sets a palette, so it's unowned and generation skips.
-				vim.cmd.colorscheme("default")
-				vim.cmd.colorscheme("default")
-				vim.notify = orig_notify
-				restore_sys()
-				restore_palette()
-
-				assert.equals(1, #notes)
-				assert.is_truthy(notes[1]:find("default", 1, true))
+				local forced = table.concat(vim.fn.readfile(themes_dir .. "/forced"), "\n")
+				assert.is_truthy(forced:find("palette = 0=", 1, true))
 			end)
 		end)
 	end)
