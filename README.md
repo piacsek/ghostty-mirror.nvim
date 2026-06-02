@@ -159,70 +159,44 @@ To hand-author a theme instead of generating one, drop a
 
 ## How it works
 
-A Ghostty theme called `foo` is just a file at
-`~/.config/ghostty/themes/foo` that defines `background`, `foreground`, and
-the 16-color `palette`. ghostty-mirror's strategy:
+A Ghostty theme is just a file at `~/.config/ghostty/themes/<name>` defining
+`background`, `foreground`, and the 16-color `palette`. On `:colorscheme`, the
+plugin writes `theme = <name>` to an include file (`theme_file`, default
+`~/.config/ghostty/theme-current`) and signals Ghostty (`SIGUSR2`) to reload.
 
-1. On `ColorScheme`, it resolves a theme name for the colorscheme (see
-   precedence below), writes `theme = <name>` to a small file Ghostty includes
-   in its config (`~/.config/ghostty/theme-current` by default).
-2. It signals Ghostty (`SIGUSR2`) to reload its config.
-3. Ghostty re-reads the include and applies the new theme.
+It picks `<name>` by precedence:
 
-`ColorScheme` is **debounced** (`debounce_ms`, default 150): a colorscheme
-picker's live preview fires the event for every scheme you scroll past, so the
-mirror waits for the selection to settle and pushes once — no reload-per-preview
-churn, and transient previews never get written or cached. (`:ThemeToGhostty` /
-`:ThemeToTmux` bypass the debounce and act immediately.)
+1. A [hand-made](docs/manual_themes.md)/cached file at `themes_dir/<name>` wins
+   (honoring the `-light` variant when `&background` is `"light"`).
+2. Otherwise it's **generated** from live highlights — `background`/`foreground`
+   from `Normal`, `cursor-color` from `Cursor`, `selection-background` from
+   `Visual`, `palette` from `g:terminal_color_*` — and cached to
+   `themes_dir/<name>` to hand-edit later. (`generate = false` requires
+   hand-made files.)
 
-**Resolving the theme name** follows this precedence:
+The highlight-derived colors always belong to the current scheme, so they
+mirror unconditionally. The palette is trickier: `g:terminal_color_*` is global
+and *sticky*, so a scheme that sets none of its own inherits the previous one's.
+The plugin snapshots it on `ColorSchemePre` and emits `palette` lines only when
+the scheme actually changed it. Most schemes (tokyonight, kanagawa, gruvbox,
+rose-pine, …) set it, so generation is zero-config; some (e.g. catppuccin) gate
+it behind a `term_colors` option — for those, or for pixel-perfect control, drop
+a hand-made file. `:ThemeToGhostty` bypasses this and writes the full live palette.
 
-1. A [hand-made](docs/manual_themes.md)/cached file at `themes_dir/<name>`
-   (honoring the `-light` variant when `&background` is `"light"`) — highest fidelity.
-2. Otherwise, **generated on the fly** from Neovim's *live* highlights:
-   `background`/`foreground` from `Normal`, `cursor-color` from `Cursor`,
-   `selection-background` from `Visual`, and `palette = 0..15` from the
-   colorscheme's `g:terminal_color_0..15`. The generated theme is cached to
-   `themes_dir/<name>` so you can hand-edit it later. (Set `generate = false`
-   to disable.)
-3. The highlight-derived colors (`background`/`foreground`/`cursor`/`selection`)
-   are always the colorscheme's own, so they're mirrored for any scheme. The
-   `palette` lines are only included when the scheme owns a full terminal
-   palette (see below); generation is skipped entirely only when `Normal` has
-   no colors to anchor the theme.
+`ColorScheme` is **debounced** (`debounce_ms`, default 150) so a colorscheme
+picker's live preview pushes once the selection settles, not per previewed
+scheme. `:ThemeToGhostty` / `:ThemeToTmux` act immediately.
 
-`g:terminal_color_*` is a *global, sticky* variable: it survives `:colorscheme`
-changes, so a scheme that sets no palette of its own inherits whatever the
-previous scheme left behind. To avoid mirroring one colorscheme's palette under
-another's name, the plugin snapshots the palette on `ColorSchemePre` and only
-emits `palette` lines when the new scheme actually changed it. The
-highlight-derived colors are unaffected — they're read from the live `Normal`,
-`Cursor`, and `Visual` groups, which always belong to the current scheme — so
-Ghostty's background, foreground, and cursor follow every theme regardless.
-`:ThemeToGhostty` bypasses the ownership check and always writes the full
-live palette.
-
-Many colorschemes (tokyonight, kanagawa, gruvbox, rose-pine, …) set
-`terminal_color_*`, so generation is zero-config for them. Some don't by
-default — e.g. catppuccin only sets the palette when you enable its
-`term_colors` option. For those — or when you want pixel-perfect control — drop
-a hand-made file in `themes_dir` (the bundled Claude Code skill can author one
-for you).
-
-The plugin owns *only* the include file and the themes it generates — it does
-not touch your main Ghostty config or your hand-made theme files.
+The plugin owns *only* the include file and the themes it generates — never your
+main Ghostty config or hand-made theme files.
 
 ### Light/dark variants
 
-Some Neovim colorscheme plugins (cyberdream is the canonical example) set the
-same `g:colors_name` for both light and dark variants — so the `ColorScheme`
-event reports `cyberdream` whether you loaded `cyberdream` or
-`cyberdream-light`. To handle this, the plugin checks `&background`: when it's
-`"light"` and a `<name><light_variant_suffix>` theme file exists, that's used
-instead. Default suffix is `-light`.
-
-So you can ship both `themes/cyberdream` and `themes/cyberdream-light` and
-the right one will load automatically.
+Some plugins (cyberdream) use the same `g:colors_name` for light and dark, so
+`ColorScheme` reports `cyberdream` either way. The plugin checks `&background`:
+when it's `"light"` and a `<name>-light` file exists, that's used instead
+(`light_variant_suffix`, default `-light`). Ship both `themes/cyberdream` and
+`themes/cyberdream-light` and the right one loads automatically.
 
 ## Considerations
 
