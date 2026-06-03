@@ -816,4 +816,34 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 	end)
+
+	describe("health", function()
+		local function fresh_health()
+			package.loaded["ghostty-mirror.health"] = nil
+			return require("ghostty-mirror.health")
+		end
+
+		it("reports ok for writable paths and a resolvable reload command", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir .. "/themes", theme_file = dir .. "/theme-current", reload_command = { "echo" } })
+				local d = fresh_health().diagnostics()
+				local errors = vim.tbl_filter(function(e) return e.status == "error" end, d)
+				assert.same({}, errors)
+			end)
+		end)
+
+		it("flags an unresolvable reload command as an error", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/theme-current", reload_command = { "ghostty-mirror-nope-xyzzy" } })
+				local d = fresh_health().diagnostics()
+				local found = false
+				for _, e in ipairs(d) do
+					if e.status == "error" and e.msg:find("reload", 1, true) then found = true end
+				end
+				assert.is_true(found)
+			end)
+		end)
+	end)
 end)

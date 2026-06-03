@@ -202,6 +202,10 @@ when it's `"light"` and a `<name>-light` file exists, that's used instead
 
 ## Troubleshooting
 
+Run `:checkhealth ghostty-mirror` first — it flags the common environmental
+causes (un-writable `themes_dir`/`theme_file`, a `reload_command` not on `$PATH`,
+tmux enabled but not running).
+
 - **Initial load.** The plugin doesn't fire on Neovim's startup colorscheme;
   opening a new nvim window won't reflow every Ghostty window. If you want the
   startup theme to follow Ghostty (rather than the other way around), read the
