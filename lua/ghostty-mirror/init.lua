@@ -393,8 +393,15 @@ function M.push(colorscheme, opts)
 		name = M.resolve(colorscheme)
 	end
 	if not name then return end
-	vim.fn.writefile({ "theme = " .. name }, M.config.theme_file)
-	vim.system(M.config.reload_command, { detach = true })
+	-- Skip the rewrite + reload when Ghostty already points at this exact theme:
+	-- SIGUSR2 reloads *every* Ghostty window, so spurious reloads (idempotent
+	-- :colorscheme, a background re-apply cascade) aren't free. Safe because the
+	-- non-force path never regenerates an existing cache, so the file Ghostty
+	-- already loaded is byte-identical. Force always rewrites and reloads.
+	if (opts and opts.force) or M.read_current() ~= name then
+		vim.fn.writefile({ "theme = " .. name }, M.config.theme_file)
+		vim.system(M.config.reload_command, { detach = true })
+	end
 	if M.config.tmux.enabled then M.push_tmux(colorscheme, opts) end
 	return name
 end
@@ -415,8 +422,14 @@ function M.push_tmux(colorscheme, opts)
 		name = M.resolve_tmux(colorscheme)
 	end
 	if not name then return end
-	vim.fn.writefile({ 'source-file "' .. cfg.themes_dir .. "/" .. name .. '.conf"' }, cfg.theme_file)
-	vim.system(cfg.reload_command or { "tmux", "source-file", cfg.theme_file }, { detach = true })
+	-- Same idempotence as M.push: skip the source + reload when tmux already
+	-- sources this exact theme (force always re-sources).
+	local line = 'source-file "' .. cfg.themes_dir .. "/" .. name .. '.conf"'
+	local current = vim.fn.filereadable(cfg.theme_file) == 1 and vim.fn.readfile(cfg.theme_file)[1] or nil
+	if (opts and opts.force) or current ~= line then
+		vim.fn.writefile({ line }, cfg.theme_file)
+		vim.system(cfg.reload_command or { "tmux", "source-file", cfg.theme_file }, { detach = true })
+	end
 	return name
 end
 
