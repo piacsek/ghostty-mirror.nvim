@@ -100,7 +100,24 @@ sync_on_focus         boolean  false
 tmux                  table    { enabled = false, ... }
                       Opt-in tmux statusline mirroring. Fields: enabled,
                       themes_dir, theme_file, generate, reload_command,
-                      bar_blend, accent_hl, divider_hl. See the README.
+                      bar_blend, accent_hl, divider_hl, overrides. See the
+                      README.
+
+tmux.overrides        table    {}                *ghostty-mirror-overrides*
+                      Per-theme tweaks merged into tmux theme generation,
+                      keyed by the resolved theme name (a light variant keys
+                      separately, e.g. "ron-light"). Recognized params:
+                      accent, divider (colors, "#rgb" or "#rrggbb") and
+                      bar_blend (0..1). They replace generation's inputs, so
+                      derived colors recompute coherently. Edits apply on the
+                      next |:colorscheme| or restart: the cached file
+                      regenerates and tmux reloads. setup() warns about an
+                      override that cannot take effect (unknown theme,
+                      unknown param, invalid value); a bad value falls back
+                      to the highlight-derived color. Overrides never touch
+                      hand-made theme files. Example: >lua
+                          tmux = { overrides = { ron = { accent = "#fff" } } }
+<
 
 ==============================================================================
 4. HEALTH                                               *ghostty-mirror-health*

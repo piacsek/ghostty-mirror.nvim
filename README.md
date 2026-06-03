@@ -102,6 +102,7 @@ require("ghostty-mirror").setup({
     bar_blend = 0.22,                                -- status bar = Normal bg blended this far toward the accent
     accent_hl = "Type",                              -- highlight group whose fg is the bright accent (selected window)
     divider_hl = "WinSeparator",                     -- inactive pane border color
+    overrides = {},                                  -- per-theme tweaks, see below
     -- reload_command = { "tmux", "source-file", "<theme_file>" },  -- default; override to taste
   },
 })
@@ -132,9 +133,35 @@ The opinion, all highlight-derived so it follows any scheme:
      "source-file ~/.config/tmux/theme-current.conf"
    ```
 
+#### Per-theme overrides
+
+When generation is almost right, tweak a single theme from config instead of
+hand-authoring a whole file:
+
+```lua
+tmux = {
+  enabled = true,
+  overrides = {
+    ron = { accent = "#fff" },                       -- replaces the accent_hl-derived accent
+    ["ron-light"] = { divider = "#ccc", bar_blend = 0.3 },
+  },
+},
+```
+
+Keys are *resolved* theme names, so a light variant gets its own entry
+(`ron-light`). Recognized params: `accent`, `divider` (colors, `#rgb` or
+`#rrggbb`) and `bar_blend` (0..1). They replace the inputs of generation, so
+everything derived from them (bar, pill text contrast, borders) recomputes
+coherently. Override edits apply on the next `:colorscheme` or restart — the
+cached file regenerates and tmux reloads automatically. Setup warns about an
+override that can't take effect (unknown theme, unknown param, invalid value);
+a bad value falls back to the highlight-derived color rather than producing a
+broken theme.
+
 To hand-author a theme instead of generating one, drop a
 `themes_dir/<name>.conf` — it always wins over generation, exactly like Ghostty
-([guide](docs/manual_tmux_themes.md)).
+([guide](docs/manual_tmux_themes.md)). Overrides apply only to generated
+themes; a hand-made file is never modified (edit it directly instead).
 
 <details>
 <summary>How I wire it into my <code>tmux.conf</code></summary>

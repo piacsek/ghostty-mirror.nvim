@@ -21,6 +21,13 @@ tmux mirroring (opt-in via `config.tmux.enabled`) adds siblings: `M.generate_tmu
 their Ghostty counterparts (same precedence). The tmux accent is the fg of a
 highlight group (`accent_hl`, default `Type`) so it harmonizes with each scheme's
 hue; the bar blends toward it and the selected-window text is contrast-picked.
+Per-theme `tmux.overrides` (keyed by resolved name) replace generation's inputs
+(`accent`/`divider`/`bar_blend`); the effective set is stamped into the generated
+file's header (`# overrides: ...`) and `resolve_tmux` regenerates on a stamp
+mismatch — that's how override edits apply without `:ThemeCacheClear`. Its second
+return value (`regenerated`) makes `push_tmux` reload even under an unchanged
+pointer. Setup warns on overrides that can't take effect; generation falls back
+on bad values. Hand-made files are never modified by overrides.
 
 Commands: `:ThemeFromGhostty` (pull), `:ThemeToGhostty`/`:ThemeToTmux` (force-push,
 immediate), `:ThemeCacheClear` (delete generated theme files, leaving hand-made ones).
