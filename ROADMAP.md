@@ -35,7 +35,7 @@ and fixed light/dark variant resolution.
 - **Docs and infra** — vimdoc (`:help ghostty-mirror`) and a stylua lint gate
   in CI.
 
-## 0.4.0 — Hardening and coverage
+## 0.3.1 — Hardening and coverage
 
 Worked through an external code review (issue #3) end to end:
 
@@ -54,7 +54,7 @@ Worked through an external code review (issue #3) end to end:
   generate/clear-cache marker round-trip, the single-reload guarantee of the
   `manage_background` cascade, and the startup-sync immediate branch.
 
-## 0.5.0 — Per-theme overrides (planned)
+## 0.4.0 — Per-theme overrides (planned)
 
 Let users tweak the auto-generated Ghostty/tmux theme per colorscheme via
 config (e.g. `tmux = { overrides = { ron = { accent = "#fff" } } }`), merged
