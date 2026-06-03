@@ -60,18 +60,25 @@ not a mirror issue.
 - **Config:** all behavior is driven by `M.config` merged from `defaults` via `vim.tbl_deep_extend("force", ...)`. New options need a default, a `---@field` doc, a README entry, and a vimdoc entry.
 - **Fail silently, never wrongly:** when inputs are missing/incomplete, no-op rather than writing something Ghostty can't load or that looks wrong.
 
+## Workflow
+
+How the user likes work to flow — follow it unless told otherwise:
+
+1. **Plan as a concrete task list.** Break the request into small, ordered tasks, each independently testable and committable. Work them top to bottom.
+2. **Drive each task with the `/tdd` skill.** Failing spec first, make it pass, refactor — small increments. Behavior changes start from a test, never from the implementation.
+3. **One commit per task.** A task is done when its specs are green (`make test`) and `make lint` is clean. Then, per task:
+   - commit with a clear message and **push straight to `main`** — no feature branch or PR (standing preference);
+   - update the locally-installed copy so it's testable in the user's running Neovim — installed via `vim.pack` at `~/.local/share/nvim/site/pack/core/opt/ghostty-mirror.nvim`, so `git -C <that path> pull --ff-only origin main`. The user then restarts Neovim (or re-`require`s the module) to load it.
+4. **Never cut a release on your own.** Tags / version bumps happen **only when explicitly asked**.
+
 ## Testing
 
-- **Default workflow: use the `/tdd` skill** to iterate on this repo — write a failing spec first, make it pass, refactor, in small increments. Behavior changes start from a test, not from the implementation.
 - Run: `make test` (headless nvim + `PlenaryBustedDirectory`). Requires plenary on the runtimepath; `minimal_init.lua` finds it in common locations.
 - Run `make lint` (stylua, config in `stylua.toml`) before pushing; `stylua .` to fix. Both `make test` and `make lint` are the quality gates.
 - CI (`.github/workflows/test.yml`) runs `make test` on Neovim **stable** and **nightly**, plus a stylua lint job, for every push to `main` and every PR. Keep them green.
 - **Every behavior change needs a test.** Reuse the spec helpers: `with_tmp_dir`, `fresh_require` (reloads the module for a clean config), `stub_system` (captures reload invocations).
 - Gotcha: setting `vim.o.background` re-applies the colorscheme and clobbers manually-set highlight groups. Set `background` **before** `nvim_set_hl` in test setup.
 - Tests mutating global state (`vim.o.background`, `vim.g.terminal_color_*`, highlights) must restore it — other specs depend on defaults.
-- A successful iteration (specs green via `make test`) can be committed and pushed to `main`.
-- **Push straight to `main`.** No feature branch or PR needed — commit and push directly (the user's standing preference).
-- After committing/pushing, update the locally-installed copy so the change is testable in the user's running Neovim. It's installed via `vim.pack` at `~/.local/share/nvim/site/pack/core/opt/ghostty-mirror.nvim` — `git -C <that path> pull --ff-only origin main`. The user then restarts Neovim (or re-`require`s the module) to load it.
 
 ## Docs
 
