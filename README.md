@@ -58,6 +58,7 @@ require("ghostty-mirror").setup({
   generate = true,                                  -- false to require hand-made files
   reload_command = { "pkill", "-SIGUSR2", "ghostty" },
   debounce_ms = 150,                                 -- coalesce rapid switches (e.g. a picker's live preview); 0 = immediate
+  overrides = {},                                    -- per-theme tweaks merged into generation (see Per-theme overrides)
   manage_background = false,                         -- opt-in: keep &background honest across switches (see Troubleshooting)
   sync_on_startup = false,                           -- opt-in: on launch, apply the theme Ghostty currently points at
   sync_on_focus = false,                             -- opt-in: on FocusGained, re-sync to the theme another nvim last wrote
@@ -133,35 +134,9 @@ The opinion, all highlight-derived so it follows any scheme:
      "source-file ~/.config/tmux/theme-current.conf"
    ```
 
-#### Per-theme overrides
-
-When generation is almost right, tweak a single theme from config instead of
-hand-authoring a whole file:
-
-```lua
-tmux = {
-  enabled = true,
-  overrides = {
-    ron = { accent = "#fff", divider = "#ccc", bar_blend = 0.3 },
-  },
-},
-```
-
-Keys are *resolved* theme names, so a light variant gets its own entry
-(`ron-light`). Recognized params: `accent`, `divider`, `bar` (colors, `#rgb`
-or `#rrggbb`) and `bar_blend` (0..1). `accent`/`divider`/`bar_blend` replace
-the inputs of generation, so everything derived from them (bar, pill text
-contrast, borders) recomputes coherently; `bar` sets the status bar color
-directly, bypassing the blend (and `bar_blend`). Override edits apply on the next `:colorscheme` or restart — the
-cached file regenerates and tmux reloads automatically. Setup warns about an
-override that can't take effect (unknown theme, unknown param, invalid value);
-a bad value falls back to the highlight-derived color rather than producing a
-broken theme.
-
 To hand-author a theme instead of generating one, drop a
 `themes_dir/<name>.conf` — it always wins over generation, exactly like Ghostty
-([guide](docs/manual_tmux_themes.md)). Overrides apply only to generated
-themes; a hand-made file is never modified (edit it directly instead).
+([guide](docs/manual_tmux_themes.md)).
 
 <details>
 <summary>How I wire it into my <code>tmux.conf</code></summary>
@@ -179,6 +154,52 @@ set-window-option -g window-status-current-format " #W "
 set-option -g focus-events on
 ```
 </details>
+
+### Per-theme overrides
+
+When generation is almost right, tweak a single theme from config instead of
+hand-authoring a whole file. Both targets take the same shape: top-level
+`overrides` for Ghostty themes, `tmux.overrides` for tmux:
+
+```lua
+require("ghostty-mirror").setup({
+  overrides = {
+    ron = {
+      background = "#101010",
+      cursor_color = "#ffaabb",
+      palette = { [3] = "#cc8800" },
+    },
+  },
+  tmux = {
+    overrides = {
+      ron = { accent = "#fff", divider = "#ccc", bar_blend = 0.3 },
+    },
+  },
+})
+```
+
+Keys are *resolved* theme names, so a light variant gets its own entry
+(`ron-light`). Colors are `#rgb` or `#rrggbb`.
+
+Ghostty params: `background`, `foreground`, `cursor_color`, `cursor_text`,
+`selection_background`, `selection_foreground` (underscores map to Ghostty's
+dashed directives) and `palette`, a table of individual ANSI slots keyed
+0..15. A color param replaces its highlight-derived value and is emitted even
+when the highlight lacks one; palette slots substitute into the scheme's own
+palette, or are emitted as a partial palette when the scheme owns none.
+
+tmux params: `accent`, `divider`, `bar` (colors) and `bar_blend` (0..1).
+`accent`/`divider`/`bar_blend` replace the inputs of generation, so everything
+derived from them (bar, pill text contrast, borders) recomputes coherently;
+`bar` sets the status bar color directly, bypassing the blend (and
+`bar_blend`).
+
+Override edits apply on the next `:colorscheme` or restart — the cached file
+regenerates and the target reloads automatically. Setup warns about an
+override that can't take effect (unknown theme, unknown param, invalid value);
+a bad value falls back to the highlight-derived color rather than producing a
+broken theme. Overrides apply only to generated themes; a hand-made file is
+never modified (edit it directly instead).
 
 ### Cursor color
 

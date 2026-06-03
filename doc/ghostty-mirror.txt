@@ -81,6 +81,28 @@ debounce_ms           integer  150
                       preview) and mirror once the scheme settles. 0 mirrors
                       synchronously on every change.
 
+overrides             table    {}                    *ghostty-mirror-overrides*
+                      Per-theme tweaks merged into Ghostty theme generation,
+                      keyed by the resolved theme name (a light variant keys
+                      separately, e.g. "ron-light"). Recognized params:
+                      background, foreground, cursor_color, cursor_text,
+                      selection_background, selection_foreground (colors,
+                      "#rgb" or "#rrggbb"; underscores map to Ghostty's
+                      dashed directives) and palette, a table of individual
+                      ANSI slots keyed 0..15. A color param replaces its
+                      highlight-derived value and is emitted even when the
+                      highlight lacks one; palette slots substitute into the
+                      scheme's own palette, or are emitted as a partial
+                      palette when the scheme owns none. Edits apply on the
+                      next |:colorscheme| or restart: the cached file
+                      regenerates and Ghostty reloads. setup() warns about an
+                      override that cannot take effect (unknown theme,
+                      unknown param, invalid value or palette slot); a bad
+                      value falls back to the highlight-derived color.
+                      Overrides never touch hand-made theme files. Example: >lua
+                          overrides = { ron = { background = "#101010" } }
+<
+
 manage_background     boolean  false
                       Opt-in. Keep 'background' honest across switches:
                       baseline to dark before a scheme loads (so adaptive
@@ -103,21 +125,15 @@ tmux                  table    { enabled = false, ... }
                       bar_blend, accent_hl, divider_hl, overrides. See the
                       README.
 
-tmux.overrides        table    {}                *ghostty-mirror-overrides*
-                      Per-theme tweaks merged into tmux theme generation,
-                      keyed by the resolved theme name (a light variant keys
-                      separately, e.g. "ron-light"). Recognized params:
-                      accent, divider, bar (colors, "#rgb" or "#rrggbb") and
+tmux.overrides        table    {}               *ghostty-mirror-tmux-overrides*
+                      Per-theme tweaks merged into tmux theme generation.
+                      Same keying, validation and regeneration semantics as
+                      |ghostty-mirror-overrides|. Recognized params: accent,
+                      divider, bar (colors, "#rgb" or "#rrggbb") and
                       bar_blend (0..1). accent/divider/bar_blend replace
                       generation's inputs, so derived colors recompute
                       coherently; bar sets the status bar color directly,
-                      bypassing the blend (and bar_blend). Edits apply on the
-                      next |:colorscheme| or restart: the cached file
-                      regenerates and tmux reloads. setup() warns about an
-                      override that cannot take effect (unknown theme,
-                      unknown param, invalid value); a bad value falls back
-                      to the highlight-derived color. Overrides never touch
-                      hand-made theme files. Example: >lua
+                      bypassing the blend (and bar_blend). Example: >lua
                           tmux = { overrides = { ron = { accent = "#fff" } } }
 <
 
