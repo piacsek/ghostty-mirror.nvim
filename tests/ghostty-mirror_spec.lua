@@ -487,6 +487,18 @@ describe("ghostty-mirror", function()
 			vim.o.background = "dark"
 		end)
 
+		it("never emits a malformed color even when the configured blend is out of range", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, bar_blend = 7 } })
+				for _, line in ipairs(mirror.generate_tmux("mytheme")) do
+					for color in line:gmatch("#%x+") do
+						assert.equals(7, #color, "malformed color " .. color .. " in: " .. line)
+					end
+				end
+			end)
+		end)
+
 		it("blends the status bar background from Normal toward the accent", function()
 			with_palette(function()
 				vim.api.nvim_set_hl(0, "Type", { fg = 0xff00ff }) -- bright magenta accent
@@ -600,6 +612,18 @@ describe("ghostty-mirror", function()
 			local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
 			assert.is_truthy(joined:find('window%-status%-current%-style "bg=#222222'))
 			vim.o.background = "dark"
+		end)
+
+		it("falls back to the configured blend when the bar_blend override is out of range", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Type", { fg = 0xff00ff })
+				local mirror = fresh_require()
+				mirror.setup({
+					tmux = { enabled = true, bar_blend = 0.25, overrides = { mytheme = { bar_blend = 7 } } },
+				})
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.equals("#561762", joined:match('status%-style "bg=(#%x%x%x%x%x%x)'))
+			end)
 		end)
 
 		it("falls back to the configured blend when the bar_blend override is not a number", function()
@@ -798,6 +822,18 @@ describe("ghostty-mirror", function()
 			end
 			assert.is_true(bad_color)
 			assert.is_true(bad_blend)
+		end)
+
+		it("notifies on an out-of-range bar_blend", function()
+			local notes, restore = stub_notify()
+			local mirror = fresh_require()
+			mirror.setup({ tmux = { enabled = true, overrides = { elflord = { bar_blend = 7 } } } })
+			restore()
+			local found = false
+			for _, n in ipairs(notes) do
+				if n.level == vim.log.levels.WARN and n.msg:find('bar_blend value "7"', 1, true) then found = true end
+			end
+			assert.is_true(found)
 		end)
 
 		it("notifies on an override keyed by a non-existing colorscheme", function()

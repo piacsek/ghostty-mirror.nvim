@@ -123,7 +123,9 @@ end
 local function blend(a, b, t)
 	local ar, ag, ab = rgb(a)
 	local br, bg, bb = rgb(b)
-	local function mix(x, y) return math.floor(x + (y - x) * t + 0.5) end
+	-- Clamp to the byte range: an out-of-range t would otherwise extrapolate
+	-- past two hex digits per channel and emit a color nothing can parse.
+	local function mix(x, y) return math.min(255, math.max(0, math.floor(x + (y - x) * t + 0.5))) end
 	return string.format("#%02x%02x%02x", mix(ar, br), mix(ag, bg), mix(ab, bb))
 end
 
@@ -138,6 +140,12 @@ local function normalize_color(color)
 	if r then return "#" .. r .. r .. g .. g .. b .. b end
 	return color:match("^#%x%x%x%x%x%x$")
 end
+
+---Whether a value is a usable blend amount: a number in 0..1. Anything else
+---would extrapolate channels past the byte range and emit a malformed color.
+---@param v any
+---@return boolean
+local function valid_blend(v) return type(v) == "number" and v >= 0 and v <= 1 end
 
 ---Return whichever of two candidates reads better on `color`: the lighter one
 ---on a dark color, the darker one on a light color. Picks by actual luminance
@@ -262,7 +270,7 @@ local function effective_overrides(name)
 	return {
 		accent = normalize_color(entry.accent),
 		divider = normalize_color(entry.divider),
-		bar_blend = type(entry.bar_blend) == "number" and entry.bar_blend or nil,
+		bar_blend = valid_blend(entry.bar_blend) and entry.bar_blend or nil,
 	}
 end
 
@@ -639,7 +647,7 @@ local function validate_config(cfg, types, prefix)
 end
 
 -- Recognized per-theme tmux override params and their expected kind.
-local override_params = { accent = "color", divider = "color", bar_blend = "number" }
+local override_params = { accent = "color", divider = "color", bar_blend = "blend" }
 
 ---Warn (don't error) about override entries that can't take effect: a typo'd
 ---param or a malformed value would otherwise be ignored without a trace.
@@ -661,7 +669,7 @@ local function validate_overrides(overrides)
 		for param, value in pairs(entry) do
 			local kind = override_params[param]
 			local invalid = (kind == "color" and not normalize_color(value))
-				or (kind == "number" and type(value) ~= "number")
+				or (kind == "blend" and not valid_blend(value))
 			if not kind then
 				warn('unknown tmux override param "%s" for theme "%s"', param, name)
 			elseif invalid then
