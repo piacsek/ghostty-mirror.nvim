@@ -58,6 +58,7 @@ require("ghostty-mirror").setup({
   debounce_ms = 150,                                 -- coalesce rapid switches (e.g. a picker's live preview); 0 = immediate
   manage_background = false,                         -- opt-in: keep &background honest across switches (see Troubleshooting)
   sync_on_startup = false,                           -- opt-in: on launch, apply the theme Ghostty currently points at
+  sync_on_focus = false,                             -- opt-in: on FocusGained, re-sync to the theme another nvim last wrote
   tmux = { enabled = false },                        -- opt-in tmux statusline mirroring (see below)
 })
 ```
@@ -68,7 +69,8 @@ require("ghostty-mirror").setup({
   (hand-made file if present, otherwise generated on the fly).
 - `:ThemeFromGhostty` → pull Ghostty's current theme into this Neovim instance.
   Run this in other nvim windows (across tmux panes, for example) to keep them
-  in sync without restarting them.
+  in sync without restarting them. Set `sync_on_focus = true` to do this
+  automatically whenever a window regains focus.
 - `:ThemeToGhostty` → force-regenerate the current colorscheme's theme from
   live highlights, overwriting any cached/hand-made file. Handy after you
   tweak a colorscheme's options and want Ghostty to pick up the new colors.

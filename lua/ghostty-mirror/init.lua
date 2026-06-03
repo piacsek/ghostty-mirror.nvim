@@ -13,6 +13,7 @@ local M = {}
 ---@field debounce_ms integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
 ---@field manage_background boolean Opt-in: keep &background honest across :colorscheme switches. Baselines &background to dark before a scheme loads (so &background-adaptive schemes like `default` don't inherit a stale light from a previous light scheme) then syncs it to the loaded scheme's Normal-bg luminance. Defaults to false.
 ---@field sync_on_startup boolean Opt-in: on setup (or VimEnter), apply the colorscheme named in theme_file so a freshly-opened nvim follows Ghostty's current theme. Defaults to false.
+---@field sync_on_focus boolean Opt-in: on FocusGained, apply the colorscheme named in theme_file when it differs from the one this instance loaded, so multiple nvim instances re-sync to whichever last wrote the theme. Defaults to false.
 ---@field tmux GhosttyMirrorTmuxConfig Opt-in tmux statusline mirroring. Disabled by default.
 
 ---@class GhosttyMirrorTmuxConfig
@@ -35,6 +36,7 @@ local defaults = {
 	debounce_ms = 150,
 	manage_background = false,
 	sync_on_startup = false,
+	sync_on_focus = false,
 	tmux = {
 		enabled = false,
 		themes_dir = vim.fn.expand("~/.config/tmux/themes"),
@@ -600,6 +602,21 @@ function M.setup(opts)
 		else
 			vim.api.nvim_create_autocmd("VimEnter", { group = group, once = true, callback = startup_sync })
 		end
+	end
+
+	if M.config.sync_on_focus then
+		-- Re-sync to whichever instance last wrote the theme when this window
+		-- regains focus. Only re-apply when it actually differs from what we
+		-- loaded, so a focus in an already-synced window is a no-op.
+		vim.api.nvim_create_autocmd("FocusGained", {
+			group = group,
+			callback = function()
+				local theme = M.read_current()
+				if theme and theme ~= M.current_scheme() then
+					pcall(vim.cmd.colorscheme, theme)
+				end
+			end,
+		})
 	end
 end
 
