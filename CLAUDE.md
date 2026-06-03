@@ -21,7 +21,7 @@ tmux mirroring (opt-in via `config.tmux.enabled`) adds siblings: `M.generate_tmu
 their Ghostty counterparts (same precedence). The tmux accent is the fg of a
 highlight group (`accent_hl`, default `Type`) so it harmonizes with each scheme's
 hue; the bar blends toward it and the selected-window text is contrast-picked.
-Per-theme overrides (keyed by resolved name; `ron`/`ron-light` separate) merge
+Per-theme overrides (keyed by resolved name; `cyberdream`/`cyberdream-light` separate) merge
 into generation on both sides: top-level `overrides` for Ghostty — the six emitted
 color keys as Lua-friendly underscores mapped to dashed directives
 (`cursor_color` → `cursor-color`; color params replace the highlight-derived value
@@ -99,5 +99,6 @@ How the user likes work to flow — follow it unless told otherwise:
 - `README.md` is user-facing and authoritative. Any config option, command, or behavior change must be reflected there (setup block, Usage, How it works) **and** in the vimdoc at `doc/ghostty-mirror.txt` — the two must not drift.
 - **Word choice:** prefer "Considerations" over "Caveats" — "caveat" reads as a gotcha/warning, which is off-putting for a plugin. Same for headings and inline ("two considerations", not "two caveats").
 - **No emojis** anywhere — README, release notes, commit messages, headings. Plain text only.
+- **Only real theme names in docs** (README, vimdoc, CLAUDE.md, LuaCATS annotations): built-ins (`ron`, `elflord`) or real plugins (`cyberdream`). Never invent one — a light-variant example is `cyberdream-light` (an actual scheme), not `ron-light` (doesn't exist). Placeholder names like `mytheme` stay confined to tests.
 - **Conciseness beats verbosity.** Keep docs to the point and expose what matters; don't restate the same idea in two places, and cut step-lists that prose covers. Every load-bearing fact stays, but say it once.
 - `.claude/skills/port-nvim-theme-to-ghostty/` is the agent skill for hand-authoring high-fidelity theme files when generation isn't good enough.

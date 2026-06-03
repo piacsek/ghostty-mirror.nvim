@@ -179,7 +179,7 @@ require("ghostty-mirror").setup({
 ```
 
 Keys are *resolved* theme names, so a light variant gets its own entry
-(`ron-light`). Colors are `#rgb` or `#rrggbb`.
+(`cyberdream-light`). Colors are `#rgb` or `#rrggbb`.
 
 Ghostty params: `background`, `foreground`, `cursor_color`, `cursor_text`,
 `selection_background`, `selection_foreground` (underscores map to Ghostty's

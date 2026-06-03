@@ -84,7 +84,7 @@ debounce_ms           integer  150
 overrides             table    {}                    *ghostty-mirror-overrides*
                       Per-theme tweaks merged into Ghostty theme generation,
                       keyed by the resolved theme name (a light variant keys
-                      separately, e.g. "ron-light"). Recognized params:
+                      separately, e.g. "cyberdream-light"). Recognized params:
                       background, foreground, cursor_color, cursor_text,
                       selection_background, selection_foreground (colors,
                       "#rgb" or "#rrggbb"; underscores map to Ghostty's

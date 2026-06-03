@@ -13,7 +13,7 @@ local M = {}
 ---@field generate? boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
 ---@field reload_command? string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
 ---@field debounce_ms? integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
----@field overrides? table<GhosttyMirrorThemeName, GhosttyMirrorGhosttyOverride> Per-theme tweaks merged into Ghostty theme generation, keyed by resolved theme name (the light variant keys separately, e.g. "ron-light"). Defaults to {}.
+---@field overrides? table<GhosttyMirrorThemeName, GhosttyMirrorGhosttyOverride> Per-theme tweaks merged into Ghostty theme generation, keyed by resolved theme name (the light variant keys separately, e.g. "cyberdream-light"). Defaults to {}.
 ---@field manage_background? boolean Opt-in: keep &background honest across :colorscheme switches. Baselines &background to dark before a scheme loads (so &background-adaptive schemes like `default` don't inherit a stale light from a previous light scheme) then syncs it to the loaded scheme's Normal-bg luminance. Defaults to false.
 ---@field sync_on_startup? boolean Opt-in: on setup (or VimEnter), apply the colorscheme named in theme_file so a freshly-opened nvim follows Ghostty's current theme. Defaults to false.
 ---@field sync_on_focus? boolean Opt-in: on FocusGained, apply the colorscheme named in theme_file when it differs from the one this instance loaded, so multiple nvim instances re-sync to whichever last wrote the theme. Defaults to false.
@@ -21,7 +21,7 @@ local M = {}
 
 ---The resolved theme name a generated theme is written under: an installed
 ---colorscheme's name, or its light variant with `light_variant_suffix`
----appended (e.g. "ron", "ron-light"). setup() warns when it matches neither.
+---appended (e.g. "cyberdream", "cyberdream-light"). setup() warns when it matches neither.
 ---@alias GhosttyMirrorThemeName string
 
 -- Lua-friendly underscore params; generation maps them to Ghostty's dashed
@@ -50,7 +50,7 @@ local M = {}
 ---@field bar_blend? number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
 ---@field accent_hl? string Highlight group whose fg is the bright accent (selected window, active divider, status-right). Sourcing it from a highlight lets the accent harmonize with each scheme's own hue. Defaults to "Type".
 ---@field divider_hl? string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
----@field overrides? table<GhosttyMirrorThemeName, GhosttyMirrorThemeOverride> Per-theme tweaks merged into generation, keyed by resolved theme name (the light variant keys separately, e.g. "ron-light"). Defaults to {}.
+---@field overrides? table<GhosttyMirrorThemeName, GhosttyMirrorThemeOverride> Per-theme tweaks merged into generation, keyed by resolved theme name (the light variant keys separately, e.g. "cyberdream-light"). Defaults to {}.
 
 ---@type GhosttyMirrorConfig
 local defaults = {
