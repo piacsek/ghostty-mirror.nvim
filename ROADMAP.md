@@ -67,6 +67,17 @@ keep winning, untouched. Also fixed the startup/focus sync to re-fire the
 mirror chain (`nested` autocmds) and sandboxed `$HOME` in the test suite so
 specs can never touch a real Ghostty/tmux config.
 
-## 0.5.0 — Ghostty per-theme overrides (planned)
+## 0.5.0 — Per-theme Ghostty overrides
 
-Extend the same override machinery to the Ghostty generation path.
+Extend 0.4.0's override machinery to the Ghostty generation path —
+`overrides = { ron = { cursor_color = "#ffaabb", palette = { [3] = "#cc8800" } } }` —
+with `foreground`, `cursor_color`, `cursor_text`, `selection_background`,
+`selection_foreground` and individual `palette` slots (0..15), keyed by
+resolved theme name. Same semantics as the tmux side: stamped caches
+regenerate seamlessly on a config edit, setup warns about overrides that
+can't take effect (including palette slots), bad values fall back to the
+highlight-derived colors, and hand-made files stay untouched. Deliberately
+no `background` param — the terminal background diverging from the editor's
+is the mismatch the plugin exists to prevent. Docs gained a "Who paints
+what" table mapping each pixel to the layer that owns it (nvim highlights,
+tmux copy-mode, Ghostty).
