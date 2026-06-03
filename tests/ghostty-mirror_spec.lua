@@ -740,6 +740,33 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("push_tmux: regenerated cache under an unchanged pointer", function()
+		it("still runs the reload so the override change reaches tmux", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local t = dir .. "/t"
+					vim.fn.mkdir(t, "p")
+					local base =
+						{ enabled = true, themes_dir = t, theme_file = dir .. "/tc.conf", reload_command = { "echo" } }
+					local mirror = fresh_require()
+					mirror.setup({ tmux = base })
+					local _, restore_seed = stub_system()
+					mirror.push_tmux("elflord")
+					restore_seed()
+					mirror.setup({
+						tmux = vim.tbl_extend("force", base, { overrides = { elflord = { accent = "#ff00aa" } } }),
+					})
+					local calls, restore = stub_system()
+					mirror.push_tmux("elflord")
+					restore()
+					local joined = table.concat(vim.fn.readfile(t .. "/elflord.conf"), "\n")
+					assert.is_truthy(joined:find("#ff00aa", 1, true))
+					assert.equals(1, #calls)
+				end)
+			end)
+		end)
+	end)
+
 	describe("setup: tmux override validation", function()
 		it("notifies on an unknown override param", function()
 			local notes, restore = stub_notify()
