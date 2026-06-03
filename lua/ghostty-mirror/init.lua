@@ -600,21 +600,23 @@ function M.push(colorscheme, opts)
 	-- No scheme to mirror (e.g. an aborted colorscheme load leaves colors_name
 	-- nil): no-op rather than writing a bogus `theme =` line Ghostty can't load.
 	if not colorscheme or not valid_name(colorscheme) then return end
-	local name
+	local name, regenerated
 	if opts and opts.force then
 		-- An explicit force trusts whatever palette is live right now.
 		palette_owned = true
 		name = M.write_generated(colorscheme)
 	else
-		name = M.resolve(colorscheme)
+		name, regenerated = M.resolve(colorscheme)
 	end
 	if not name then return end
 	-- Skip the rewrite + reload when Ghostty already points at this exact theme:
 	-- SIGUSR2 reloads *every* Ghostty window, so spurious reloads (idempotent
 	-- :colorscheme, a background re-apply cascade) aren't free. Safe because the
-	-- non-force path never regenerates an existing cache, so the file Ghostty
-	-- already loaded is byte-identical. Force always rewrites and reloads.
-	if (opts and opts.force) or M.read_current() ~= name then
+	-- non-force path only regenerates a stale-stamped cache, so the file Ghostty
+	-- already loaded is byte-identical unless `regenerated` says otherwise. A
+	-- cache regenerated under an unchanged pointer still reloads — the file
+	-- content changed. Force always rewrites and reloads.
+	if (opts and opts.force) or regenerated or M.read_current() ~= name then
 		vim.fn.writefile({ "theme = " .. name }, M.config.theme_file)
 		vim.system(M.config.reload_command, { detach = true })
 	end

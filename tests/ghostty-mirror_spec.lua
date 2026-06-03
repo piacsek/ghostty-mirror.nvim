@@ -1100,6 +1100,32 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("push: regenerated cache under an unchanged pointer", function()
+		it("still runs the reload so the override change reaches Ghostty", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local g = dir .. "/g"
+					vim.fn.mkdir(g, "p")
+					local base = { themes_dir = g, theme_file = dir .. "/g-current", reload_command = { "echo" } }
+					local mirror = fresh_require()
+					mirror.setup(base)
+					local _, restore_seed = stub_system()
+					mirror.push("elflord")
+					restore_seed()
+					mirror.setup(
+						vim.tbl_extend("force", base, { overrides = { elflord = { background = "#101010" } } })
+					)
+					local calls, restore = stub_system()
+					mirror.push("elflord")
+					restore()
+					local joined = table.concat(vim.fn.readfile(g .. "/elflord"), "\n")
+					assert.is_truthy(joined:find("#101010", 1, true))
+					assert.equals(1, #calls)
+				end)
+			end)
+		end)
+	end)
+
 	describe("push_tmux: regenerated cache under an unchanged pointer", function()
 		it("still runs the reload so the override change reaches tmux", function()
 			with_palette(function()
@@ -1122,6 +1148,48 @@ describe("ghostty-mirror", function()
 					local joined = table.concat(vim.fn.readfile(t .. "/elflord.conf"), "\n")
 					assert.is_truthy(joined:find("#ff00aa", 1, true))
 					assert.equals(1, #calls)
+				end)
+			end)
+		end)
+	end)
+
+	describe("integration: ghostty override edit across a restart", function()
+		it("startup sync regenerates a stale-stamped cache and reloads Ghostty", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local g = dir .. "/g"
+					vim.fn.mkdir(g, "p")
+					local function config(background, sync)
+						return {
+							themes_dir = g,
+							theme_file = dir .. "/g-current",
+							reload_command = { "echo", "ghostty" },
+							debounce_ms = 0,
+							sync_on_startup = sync,
+							overrides = { elflord = { background = background } },
+						}
+					end
+					-- Previous session: cache generated under the old override,
+					-- the pointer already names the theme.
+					local mirror = fresh_require()
+					local _, restore_seed = stub_system()
+					mirror.setup(config("#111111", false))
+					mirror.push("elflord")
+					restore_seed()
+					-- "Restart": fresh instance, override edited in config, and
+					-- sync_on_startup re-applies the pointed-at colorscheme.
+					mirror = fresh_require()
+					local calls, restore = stub_system()
+					mirror.setup(config("#222222", true))
+					vim.api.nvim_exec_autocmds("VimEnter", {})
+					restore()
+					local joined = table.concat(vim.fn.readfile(g .. "/elflord"), "\n")
+					assert.is_truthy(joined:find("#222222", 1, true))
+					local reloaded = false
+					for _, c in ipairs(calls) do
+						if c.cmd[2] == "ghostty" then reloaded = true end
+					end
+					assert.is_true(reloaded)
 				end)
 			end)
 		end)
