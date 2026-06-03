@@ -33,6 +33,22 @@ local function stub_notify()
 	return notes, function() vim.notify = original end
 end
 
+---Run fn with vim.notify captured. Centralizes the deferred-warning dance:
+---drains notifications scheduled by earlier tests so they don't leak into this
+---capture window, and restores vim.notify even when an assertion throws.
+---fn receives the captured notes and a wait(count) that runs the event loop
+---until that many notifications arrive (warnings are vim.schedule-deferred).
+local function with_notify(fn)
+	vim.wait(50)
+	local notes, restore = stub_notify()
+	local function wait(count)
+		vim.wait(200, function() return #notes >= count end)
+	end
+	local ok, err = pcall(fn, notes, wait)
+	restore()
+	if not ok then error(err) end
+end
+
 ---Set a full terminal palette plus Normal/Cursor/Visual highlights so generation
 ---has everything it needs, and return after restoring the palette.
 local function with_palette(fn)
@@ -583,17 +599,16 @@ describe("ghostty-mirror", function()
 
 		it("generates the unmodified theme for an empty override table", function()
 			with_palette(function()
-				vim.wait(50) -- drain warnings scheduled by earlier tests before capturing
-				local notes, restore = stub_notify()
-				local mirror = fresh_require()
-				mirror.setup({ tmux = { enabled = true } })
-				local plain = mirror.generate_tmux("elflord")
-				mirror.setup({ tmux = { enabled = true, overrides = { elflord = {} } } })
-				local overridden = mirror.generate_tmux("elflord")
-				vim.wait(50)
-				restore()
-				assert.same(plain, overridden)
-				assert.same({}, notes)
+				with_notify(function(notes)
+					local mirror = fresh_require()
+					mirror.setup({ tmux = { enabled = true } })
+					local plain = mirror.generate_tmux("elflord")
+					mirror.setup({ tmux = { enabled = true, overrides = { elflord = {} } } })
+					local overridden = mirror.generate_tmux("elflord")
+					vim.wait(50)
+					assert.same(plain, overridden)
+					assert.same({}, notes)
+				end)
 			end)
 		end)
 
@@ -794,102 +809,82 @@ describe("ghostty-mirror", function()
 	end)
 
 	describe("setup: tmux override validation", function()
-		---Warnings are vim.schedule-deferred; run the loop until `count` arrive
-		---(or a grace period passes), so each test drains its own queue and no
-		---scheduled warning leaks into the next test's stub.
-		local function wait_notes(notes, count)
-			vim.wait(200, function() return #notes >= count end)
+		---Whether a captured WARN notification contains `needle`.
+		local function warned(notes, needle)
+			for _, n in ipairs(notes) do
+				if n.level == vim.log.levels.WARN and n.msg:find(needle, 1, true) then return true end
+			end
+			return false
 		end
 
 		it("notifies on an unknown override param", function()
-			local notes, restore = stub_notify()
-			local mirror = fresh_require()
-			mirror.setup({ tmux = { enabled = true, overrides = { elflord = { acent = "#fff" } } } })
-			wait_notes(notes, 1)
-			restore()
-			local found = false
-			for _, n in ipairs(notes) do
-				if n.level == vim.log.levels.WARN and n.msg:find("acent", 1, true) then found = true end
-			end
-			assert.is_true(found)
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, overrides = { elflord = { acent = "#fff" } } } })
+				wait(1)
+				assert.is_true(warned(notes, "acent"))
+			end)
 		end)
 
 		it("notifies on an invalid override value", function()
-			local notes, restore = stub_notify()
-			local mirror = fresh_require()
-			mirror.setup({
-				tmux = { enabled = true, overrides = { elflord = { divider = "nope", bar_blend = "half" } } },
-			})
-			wait_notes(notes, 2)
-			restore()
-			local bad_color, bad_blend = false, false
-			for _, n in ipairs(notes) do
-				if n.level == vim.log.levels.WARN and n.msg:find('divider value "nope"', 1, true) then
-					bad_color = true
-				end
-				if n.level == vim.log.levels.WARN and n.msg:find('bar_blend value "half"', 1, true) then
-					bad_blend = true
-				end
-			end
-			assert.is_true(bad_color)
-			assert.is_true(bad_blend)
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({
+					tmux = { enabled = true, overrides = { elflord = { divider = "nope", bar_blend = "half" } } },
+				})
+				wait(2)
+				assert.is_true(warned(notes, 'divider value "nope"'))
+				assert.is_true(warned(notes, 'bar_blend value "half"'))
+			end)
 		end)
 
 		it("notifies on an out-of-range bar_blend", function()
-			local notes, restore = stub_notify()
-			local mirror = fresh_require()
-			mirror.setup({ tmux = { enabled = true, overrides = { elflord = { bar_blend = 7 } } } })
-			wait_notes(notes, 1)
-			restore()
-			local found = false
-			for _, n in ipairs(notes) do
-				if n.level == vim.log.levels.WARN and n.msg:find('bar_blend value "7"', 1, true) then found = true end
-			end
-			assert.is_true(found)
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, overrides = { elflord = { bar_blend = 7 } } } })
+				wait(1)
+				assert.is_true(warned(notes, 'bar_blend value "7"'))
+			end)
 		end)
 
 		it("delivers warnings to a vim.notify replacement installed after setup", function()
+			-- Deliberately not with_notify: the point is that setup runs while the
+			-- builtin vim.notify is still in place (early in a user config) and a
+			-- notifier plugin replacing it later in startup still gets the warning,
+			-- instead of the builtin echo blocking on Press ENTER.
 			local mirror = fresh_require()
-			-- setup runs early in a user config; a notifier plugin (nvim-notify,
-			-- noice) replaces vim.notify later in startup and must still get the
-			-- warning, instead of the builtin echo blocking on Press ENTER.
 			mirror.setup({ tmux = { enabled = true, overrides = { elflord = { bar_blend = 7 } } } })
 			local notes, restore = stub_notify()
-			wait_notes(notes, 1)
+			vim.wait(200, function() return #notes > 0 end)
 			restore()
 			assert.equals(1, #notes)
 			assert.is_truthy(notes[1].msg:find('bar_blend value "7"', 1, true))
 		end)
 
 		it("notifies on an override keyed by a non-existing colorscheme", function()
-			local notes, restore = stub_notify()
-			local mirror = fresh_require()
-			mirror.setup({ tmux = { enabled = true, overrides = { no_such_scheme_xyzzy = { accent = "#fff" } } } })
-			wait_notes(notes, 1)
-			restore()
-			local found = false
-			for _, n in ipairs(notes) do
-				if n.level == vim.log.levels.WARN and n.msg:find("no_such_scheme_xyzzy", 1, true) then found = true end
-			end
-			assert.is_true(found)
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, overrides = { no_such_scheme_xyzzy = { accent = "#fff" } } } })
+				wait(1)
+				assert.is_true(warned(notes, "no_such_scheme_xyzzy"))
+			end)
 		end)
 
 		it("does not notify for valid overrides, including a light-variant key", function()
-			vim.wait(50) -- drain warnings scheduled by earlier tests before capturing
-			local notes, restore = stub_notify()
-			local mirror = fresh_require()
-			mirror.setup({
-				tmux = {
-					enabled = true,
-					overrides = {
-						elflord = { accent = "#fff", divider = "#123456", bar_blend = 0.3 },
-						["elflord-light"] = { accent = "#000" },
+			with_notify(function(notes)
+				local mirror = fresh_require()
+				mirror.setup({
+					tmux = {
+						enabled = true,
+						overrides = {
+							elflord = { accent = "#fff", divider = "#123456", bar_blend = 0.3 },
+							["elflord-light"] = { accent = "#000" },
+						},
 					},
-				},
-			})
-			vim.wait(50)
-			restore()
-			assert.same({}, notes)
+				})
+				vim.wait(50)
+				assert.same({}, notes)
+			end)
 		end)
 	end)
 
