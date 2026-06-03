@@ -1024,4 +1024,38 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 	end)
+
+	describe("manage_background + palette", function()
+		it("keeps the scheme palette when the &background sync re-applies the scheme", function()
+			with_tmp_dir(function(dir)
+				-- a real, loadable light scheme that owns a full terminal palette but does
+				-- not set &background itself (like cyberdream-light)
+				local rtp = dir .. "/rtp"
+				vim.fn.mkdir(rtp .. "/colors", "p")
+				vim.fn.writefile({
+					'vim.g.colors_name = "gm_testlight"',
+					'for i = 0, 15 do vim.g["terminal_color_" .. i] = string.format("#%02xabcd", i) end',
+					'vim.api.nvim_set_hl(0, "Normal", { fg = 0x222222, bg = 0xeeeeee })',
+				}, rtp .. "/colors/gm_testlight.lua")
+				vim.opt.runtimepath:prepend(rtp)
+				local saved_bg = vim.o.background
+				local saved_pal = {}
+				for i = 0, 15 do saved_pal[i] = vim.g["terminal_color_" .. i]; vim.g["terminal_color_" .. i] = nil end
+				local _, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir .. "/themes", theme_file = dir .. "/tc", reload_command = { "echo" }, debounce_ms = 0, manage_background = true })
+				vim.o.background = "dark"
+				vim.cmd.colorscheme("gm_testlight")
+				restore()
+				vim.opt.runtimepath:remove(rtp)
+				assert.equals("light", vim.o.background)
+				local name = mirror.read_current()
+				assert.is_not_nil(name)
+				local body = table.concat(vim.fn.readfile(dir .. "/themes/" .. name), "\n")
+				assert.is_truthy(body:find("palette = 0=", 1, true))
+				for i = 0, 15 do vim.g["terminal_color_" .. i] = saved_pal[i] end
+				vim.o.background = saved_bg
+			end)
+		end)
+	end)
 end)
