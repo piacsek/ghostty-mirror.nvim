@@ -158,6 +158,13 @@ local palette_owned = true
 -- the scheme settles (see config.debounce_ms).
 local push_timer
 
+-- The colorscheme name from the last ColorScheme event's `match`. This is the
+-- name as loaded (`cyberdream-light`), which can differ from `g:colors_name`
+-- (some schemes, e.g. cyberdream, set it to a base name like `cyberdream` for
+-- every variant). The force commands prefer this so they mirror the variant
+-- actually on screen.
+local last_scheme
+
 ---Mirror `colorscheme`, debounced by config.debounce_ms. A new change cancels
 ---the pending one, so only the settled scheme is pushed. 0 pushes immediately.
 ---@param colorscheme string
@@ -458,6 +465,15 @@ function M.pull()
 	vim.cmd.colorscheme(theme)
 end
 
+---The colorscheme name to act on for the force commands: the last settled
+---ColorScheme `match` if one has fired, else `g:colors_name`. Prefers the
+---event match because some schemes set `g:colors_name` to a base name shared
+---across variants, which would mirror the wrong file.
+---@return string
+function M.current_scheme()
+	return last_scheme or vim.g.colors_name or ""
+end
+
 ---@param opts? GhosttyMirrorConfig
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
@@ -472,6 +488,7 @@ function M.setup(opts)
 	vim.api.nvim_create_autocmd("ColorScheme", {
 		group = group,
 		callback = function(ev)
+			last_scheme = ev.match
 			local cur = snapshot_palette()
 			palette_owned = prev_palette == nil or not palettes_equal(prev_palette, cur)
 			schedule_push(ev.match)
@@ -483,13 +500,13 @@ function M.setup(opts)
 	})
 
 	vim.api.nvim_create_user_command("ThemeToGhostty", function()
-		M.push(vim.g.colors_name or "", { force = true })
+		M.push(M.current_scheme(), { force = true })
 	end, {
 		desc = "Regenerate the current colorscheme's Ghostty theme from live highlights",
 	})
 
 	vim.api.nvim_create_user_command("ThemeToTmux", function()
-		M.push_tmux(vim.g.colors_name or "", { force = true })
+		M.push_tmux(M.current_scheme(), { force = true })
 	end, {
 		desc = "Regenerate the current colorscheme's tmux theme from live highlights",
 	})

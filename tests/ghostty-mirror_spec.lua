@@ -846,4 +846,29 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 	end)
+
+	describe("current_scheme", function()
+		it("falls back to vim.g.colors_name before any ColorScheme settles", function()
+			local saved = vim.g.colors_name
+			local mirror = fresh_require()
+			mirror.setup({ generate = false })
+			vim.g.colors_name = "some_scheme"
+			assert.equals("some_scheme", mirror.current_scheme())
+			vim.g.colors_name = saved
+		end)
+
+		it("prefers the last settled ColorScheme match over vim.g.colors_name", function()
+			-- cyberdream sets colors_name='cyberdream' even when you load cyberdream-light;
+			-- the ColorScheme event's match carries the real loaded name.
+			local saved = vim.g.colors_name
+			local _, restore = stub_system()
+			local mirror = fresh_require()
+			mirror.setup({ generate = false, debounce_ms = 0 })
+			vim.g.colors_name = "cyberdream"
+			vim.api.nvim_exec_autocmds("ColorScheme", { group = "ghostty-mirror", pattern = "cyberdream-light" })
+			restore()
+			assert.equals("cyberdream-light", mirror.current_scheme())
+			vim.g.colors_name = saved
+		end)
+	end)
 end)
