@@ -79,24 +79,6 @@ when the scheme sets its own `g:terminal_color_*` (some, like catppuccin, gate
 it behind `term_colors`). See [How it works](#how-it-works) for the details and
 the hand-made-file escape hatch.
 
-### Cursor color
-
-The generated theme includes a `cursor-color`, but **Ghostty only applies it on
-a full restart** — it isn't re-read on a live config reload. So the cursor
-won't follow `:colorscheme` through ghostty-mirror alone. To get a
-theme-following cursor *inside Neovim*, point `guicursor` at the `Cursor`
-highlight so Neovim sets the cursor color itself (via OSC 12):
-
-```lua
-vim.opt.guicursor = "n-v-c-sm:block-Cursor/lCursor,"
-  .. "i-ci-ve:ver25-Cursor/lCursor,r-cr-o:hor20-Cursor/lCursor,"
-  .. "t:block-blinkon500-blinkoff500-TermCursor"
-```
-
-This requires the colorscheme to define a `Cursor` highlight, and it governs
-the cursor only while Neovim is focused — the shell-prompt cursor still comes
-from Ghostty's config.
-
 ### tmux
 
 Opt in to mirror the colorscheme into tmux's statusline too:
@@ -143,6 +125,38 @@ The opinion, all highlight-derived so it follows any scheme:
 To hand-author a theme instead of generating one, drop a
 `themes_dir/<name>.conf` — it always wins over generation, exactly like Ghostty
 ([guide](docs/manual_tmux_themes.md)).
+
+<details>
+<summary>How I wire it into my <code>tmux.conf</code></summary>
+
+```tmux
+# Colors can be overridden by re-setting these options after your own theme
+# block — that's exactly what ghostty-mirror's generated theme does on reload.
+
+# Window labels: name only, color-free, so the styles from the generated theme
+# apply (an inline #[bg=…] would override them).
+set-window-option -g window-status-format " #W "
+set-window-option -g window-status-current-format " #W "
+```
+</details>
+
+### Cursor color
+
+The generated theme includes a `cursor-color`, but **Ghostty only applies it on
+a full restart** — it isn't re-read on a live config reload. So the cursor
+won't follow `:colorscheme` through ghostty-mirror alone. To get a
+theme-following cursor *inside Neovim*, point `guicursor` at the `Cursor`
+highlight so Neovim sets the cursor color itself (via OSC 12):
+
+```lua
+vim.opt.guicursor = "n-v-c-sm:block-Cursor/lCursor,"
+  .. "i-ci-ve:ver25-Cursor/lCursor,r-cr-o:hor20-Cursor/lCursor,"
+  .. "t:block-blinkon500-blinkoff500-TermCursor"
+```
+
+This requires the colorscheme to define a `Cursor` highlight, and it governs
+the cursor only while Neovim is focused — the shell-prompt cursor still comes
+from Ghostty's config.
 
 
 ## How it works
