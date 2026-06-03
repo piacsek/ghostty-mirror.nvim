@@ -9,7 +9,7 @@ to match — across every open window, instantly.
 
 https://github.com/user-attachments/assets/edb22f4a-2b3b-4704-9dae-88302277ea6e
 
-> The colorschemes in the demo are [scintilla.nvim](https://github.com/piacsek/scintilla.nvim) — my other plugin. Grab it if you like the look.
+The colorschemes in the demo are [scintilla.nvim](https://github.com/piacsek/scintilla.nvim) — my other plugin. Grab it if you like the look.
 
 ## Installation
 
