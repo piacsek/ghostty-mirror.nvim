@@ -14,6 +14,15 @@ local function writable(path)
 	return vim.fn.filewritable(vim.fn.fnamemodify(path, ":h")) == 2
 end
 
+---Best-effort: is a Ghostty process running? true/false, or nil when we can't
+---tell (no `pgrep`). Overridable so diagnostics() stays unit-testable.
+---@return boolean|nil
+function M.ghostty_running()
+	if vim.fn.executable("pgrep") ~= 1 then return nil end
+	vim.fn.system({ "pgrep", "-x", "ghostty" })
+	return vim.v.shell_error == 0
+end
+
 ---Structured diagnostics, decoupled from vim.health so they're unit-testable.
 ---@return { status: "ok"|"warn"|"error"|"info", msg: string }[]
 function M.diagnostics()
@@ -38,6 +47,15 @@ function M.diagnostics()
 		add("ok", "reload command on PATH: " .. table.concat(cfg.reload_command, " "))
 	else
 		add("error", "reload command not executable: " .. tostring(cmd))
+	end
+
+	local running = M.ghostty_running()
+	if running == nil then
+		add("info", "could not check for a running Ghostty (pgrep unavailable)")
+	elseif running then
+		add("ok", "Ghostty process is running")
+	else
+		add("warn", "no running Ghostty found; reloads silently no-op until one starts")
 	end
 
 	if cfg.tmux and cfg.tmux.enabled then

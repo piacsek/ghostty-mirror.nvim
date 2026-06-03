@@ -1144,4 +1144,39 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 	end)
+
+	describe("health: ghostty process", function()
+		local function fresh_health()
+			package.loaded["ghostty-mirror.health"] = nil
+			return require("ghostty-mirror.health")
+		end
+
+		it("warns when no Ghostty process is running", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/tc", reload_command = { "echo" } })
+				local h = fresh_health()
+				h.ghostty_running = function() return false end
+				local found = false
+				for _, e in ipairs(h.diagnostics()) do
+					if e.status == "warn" and e.msg:find("Ghostty", 1, true) then found = true end
+				end
+				assert.is_true(found)
+			end)
+		end)
+
+		it("reports ok when a Ghostty process is running", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/tc", reload_command = { "echo" } })
+				local h = fresh_health()
+				h.ghostty_running = function() return true end
+				local found = false
+				for _, e in ipairs(h.diagnostics()) do
+					if e.status == "ok" and e.msg:find("Ghostty", 1, true) then found = true end
+				end
+				assert.is_true(found)
+			end)
+		end)
+	end)
 end)
