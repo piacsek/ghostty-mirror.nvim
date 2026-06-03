@@ -543,6 +543,55 @@ describe("ghostty-mirror", function()
 				end)
 			end)
 		end)
+
+		it("substitutes palette slot overrides into an owned palette", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { mytheme = { palette = { [3] = "#cc8800" } } } })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("palette = 3=#cc8800", 1, true))
+				-- the other 15 slots stay the live palette's own
+				assert.is_truthy(joined:find("palette = 0=#000000", 1, true))
+				assert.is_truthy(joined:find("palette = 15=#0f0000", 1, true))
+			end)
+		end)
+
+		it("emits overridden slots as a partial palette when the scheme owns none", function()
+			with_palette(function()
+				-- an incomplete live palette is never mirrored (see palette ownership);
+				-- explicit slot overrides outrank that caution for their own slots
+				vim.g.terminal_color_7 = nil
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { mytheme = { palette = { [3] = "#cc8800", [9] = "#11aa22" } } } })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("palette = 3=#cc8800", 1, true))
+				assert.is_truthy(joined:find("palette = 9=#11aa22", 1, true))
+				assert.is_nil(joined:find("palette = 0=", 1, true))
+			end)
+		end)
+
+		it("drops bad palette slots and colors while the valid rest applies", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({
+					overrides = { mytheme = { palette = { [3] = "#cc8800", [16] = "#111111", [4] = "zzz" } } },
+				})
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("palette = 3=#cc8800", 1, true))
+				assert.is_truthy(joined:find("palette = 4=#040000", 1, true))
+				assert.is_nil(joined:find("16=", 1, true))
+			end)
+		end)
+
+		it("does not emit a palette for an empty palette table when the scheme owns none", function()
+			with_palette(function()
+				vim.g.terminal_color_7 = nil
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { mytheme = { palette = {} } } })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_nil(joined:find("palette = ", 1, true))
+			end)
+		end)
 	end)
 
 	describe("generate_tmux", function()

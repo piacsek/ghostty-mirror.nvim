@@ -161,6 +161,11 @@ end
 ---@return boolean
 local function valid_blend(v) return type(v) == "number" and v >= 0 and v <= 1 end
 
+---Whether a value is a usable palette slot index: an integer in 0..15.
+---@param slot any
+---@return boolean
+local function valid_slot(slot) return type(slot) == "number" and slot >= 0 and slot <= 15 and slot % 1 == 0 end
+
 ---Return whichever of two candidates reads better on `color`: the lighter one
 ---on a dark color, the darker one on a light color. Picks by actual luminance
 ---(not by assuming which candidate is light), so it's correct on light themes
@@ -281,7 +286,7 @@ end
 ---@return GhosttyMirrorGhosttyOverride
 local function ghostty_effective_overrides(name)
 	local entry = M.config.overrides[name] or {}
-	return {
+	local o = {
 		background = normalize_color(entry.background),
 		foreground = normalize_color(entry.foreground),
 		cursor_color = normalize_color(entry.cursor_color),
@@ -289,6 +294,16 @@ local function ghostty_effective_overrides(name)
 		selection_background = normalize_color(entry.selection_background),
 		selection_foreground = normalize_color(entry.selection_foreground),
 	}
+	-- Bad slots/colors drop here so the valid rest still applies.
+	if type(entry.palette) == "table" then
+		local p = {}
+		for slot, color in pairs(entry.palette) do
+			local c = normalize_color(color)
+			if valid_slot(slot) and c then p[slot] = c end
+		end
+		if next(p) then o.palette = p end
+	end
+	return o
 end
 
 ---The normalized per-theme tmux overrides that actually take effect for a
@@ -363,7 +378,15 @@ function M.generate(colorscheme)
 	if palette_owned and palette_complete(palette) then
 		table.insert(lines, "")
 		for i = 0, 15 do
-			table.insert(lines, "palette = " .. i .. "=" .. palette[i])
+			table.insert(lines, "palette = " .. i .. "=" .. ((o.palette and o.palette[i]) or palette[i]))
+		end
+	elseif o.palette then
+		-- The scheme owns no palette to substitute into, but a slot override is
+		-- explicit user intent: emit just those slots as a partial palette,
+		-- outranking the inherited-palette caution above.
+		table.insert(lines, "")
+		for i = 0, 15 do
+			if o.palette[i] then table.insert(lines, "palette = " .. i .. "=" .. o.palette[i]) end
 		end
 	end
 	return lines
@@ -694,11 +717,6 @@ local ghostty_override_params = {
 	selection_foreground = "color",
 	palette = "palette",
 }
-
----Whether a value is a usable palette slot index: an integer in 0..15.
----@param slot any
----@return boolean
-local function valid_slot(slot) return type(slot) == "number" and slot >= 0 and slot <= 15 and slot % 1 == 0 end
 
 ---Warn (don't error) about override entries that can't take effect: a typo'd
 ---param or a malformed value would otherwise be ignored without a trace.
