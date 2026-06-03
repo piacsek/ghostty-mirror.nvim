@@ -18,6 +18,16 @@ local M = {}
 ---@field sync_on_focus? boolean Opt-in: on FocusGained, apply the colorscheme named in theme_file when it differs from the one this instance loaded, so multiple nvim instances re-sync to whichever last wrote the theme. Defaults to false.
 ---@field tmux? GhosttyMirrorTmuxConfig Opt-in tmux statusline mirroring. Disabled by default.
 
+---The resolved theme name a generated theme is written under: an installed
+---colorscheme's name, or its light variant with `light_variant_suffix`
+---appended (e.g. "ron", "ron-light"). setup() warns when it matches neither.
+---@alias GhosttyMirrorThemeName string
+
+---@class GhosttyMirrorThemeOverride
+---@field accent? string Replaces the accent_hl-derived accent ("#rgb" or "#rrggbb").
+---@field divider? string Replaces the divider_hl-derived pane border color ("#rgb" or "#rrggbb").
+---@field bar_blend? number Replaces tmux.bar_blend for this theme only, 0..1.
+
 ---@class GhosttyMirrorTmuxConfig
 ---@field enabled? boolean Mirror the colorscheme into tmux's statusline on :colorscheme. Defaults to false (opt-in).
 ---@field themes_dir? string Directory tmux theme files live in / are cached to. Defaults to ~/.config/tmux/themes.
@@ -27,7 +37,7 @@ local M = {}
 ---@field bar_blend? number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
 ---@field accent_hl? string Highlight group whose fg is the bright accent (selected window, active divider, status-right). Sourcing it from a highlight lets the accent harmonize with each scheme's own hue. Defaults to "Type".
 ---@field divider_hl? string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
----@field overrides? table<string, { accent?: string, divider?: string, bar_blend?: number }> Per-theme tweaks merged into generation, keyed by resolved theme name (the light variant keys separately, e.g. "ron-light"). Colors accept "#rgb"/"#rrggbb". Defaults to {}.
+---@field overrides? table<GhosttyMirrorThemeName, GhosttyMirrorThemeOverride> Per-theme tweaks merged into generation, keyed by resolved theme name (the light variant keys separately, e.g. "ron-light"). Defaults to {}.
 
 ---@type GhosttyMirrorConfig
 local defaults = {
@@ -245,8 +255,8 @@ end
 
 ---The normalized per-theme tmux overrides that actually take effect for a
 ---resolved theme name; invalid values are absent so generation falls back.
----@param name string
----@return { accent?: string, divider?: string, bar_blend?: number }
+---@param name GhosttyMirrorThemeName
+---@return GhosttyMirrorThemeOverride
 local function effective_overrides(name)
 	local entry = M.config.tmux.overrides[name] or {}
 	return {
