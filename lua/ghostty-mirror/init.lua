@@ -386,6 +386,9 @@ end
 ---@param opts? { force?: boolean } # force regenerates from live highlights, ignoring any existing file
 ---@return string|nil # the theme name written, or nil when nothing was written
 function M.push(colorscheme, opts)
+	-- No scheme to mirror (e.g. an aborted colorscheme load leaves colors_name
+	-- nil): no-op rather than writing a bogus `theme =` line Ghostty can't load.
+	if not colorscheme or colorscheme == "" then return end
 	local name
 	if opts and opts.force then
 		-- An explicit force trusts whatever palette is live right now.
@@ -415,6 +418,7 @@ end
 ---@param opts? { force?: boolean }
 ---@return string|nil # the theme name written, or nil when nothing was written
 function M.push_tmux(colorscheme, opts)
+	if not colorscheme or colorscheme == "" then return end
 	local cfg = M.config.tmux
 	local name
 	if opts and opts.force then
