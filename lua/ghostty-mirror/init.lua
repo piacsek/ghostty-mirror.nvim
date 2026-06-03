@@ -222,10 +222,16 @@ function M.generate(colorscheme)
 	local cursor = hl("Cursor")
 	local cc = hex(cursor.bg) or hex(cursor.fg)
 	if cc then table.insert(lines, "cursor-color = " .. cc) end
+	-- cursor-text is the glyph color under the block cursor; only meaningful when
+	-- the cursor owns a bg (so cursor-color above came from bg, not from fg).
+	local ct = hex(cursor.fg)
+	if ct and cursor.bg then table.insert(lines, "cursor-text = " .. ct) end
 
 	local visual = hl("Visual")
 	local sel = hex(visual.bg)
 	if sel then table.insert(lines, "selection-background = " .. sel) end
+	local sel_fg = hex(visual.fg)
+	if sel_fg then table.insert(lines, "selection-foreground = " .. sel_fg) end
 
 	local palette = snapshot_palette()
 	if palette_owned and palette_complete(palette) then

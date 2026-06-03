@@ -171,8 +171,9 @@ It picks `<name>` by precedence:
 1. A [hand-made](docs/manual_themes.md)/cached file at `themes_dir/<name>` wins
    (honoring the `-light` variant when `&background` is `"light"`).
 2. Otherwise it's **generated** from live highlights — `background`/`foreground`
-   from `Normal`, `cursor-color` from `Cursor`, `selection-background` from
-   `Visual`, `palette` from `g:terminal_color_*` — and cached to
+   from `Normal`, `cursor-color`/`cursor-text` from `Cursor`,
+   `selection-background`/`selection-foreground` from `Visual`, `palette` from
+   `g:terminal_color_*` — and cached to
    `themes_dir/<name>` to hand-edit later. (`generate = false` requires
    hand-made files.)
 
