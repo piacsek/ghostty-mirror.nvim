@@ -653,7 +653,14 @@ local override_params = { accent = "color", divider = "color", bar_blend = "blen
 ---param or a malformed value would otherwise be ignored without a trace.
 ---@param overrides table<string, table>
 local function validate_overrides(overrides)
-	local function warn(fmt, ...) vim.notify("ghostty-mirror: " .. fmt:format(...), vim.log.levels.WARN) end
+	-- Deferred: setup usually runs early in a user config, before a notifier
+	-- plugin (nvim-notify, noice) has replaced vim.notify. Scheduling resolves
+	-- vim.notify after startup, so warnings land in the user's notifier instead
+	-- of the builtin echo and its blocking Press-ENTER prompt.
+	local function warn(fmt, ...)
+		local msg = "ghostty-mirror: " .. fmt:format(...)
+		vim.schedule(function() vim.notify(msg, vim.log.levels.WARN) end)
+	end
 	-- Override keys are *resolved* names: the light variant carries the suffix
 	-- without being a colorscheme of its own, so accept "<scheme><suffix>" too.
 	local known = {}
