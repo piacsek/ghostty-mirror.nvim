@@ -1,0 +1,134 @@
+*ghostty-mirror.txt*      Mirror Neovim's colorscheme into Ghostty (and tmux)
+
+==============================================================================
+CONTENTS                                              *ghostty-mirror-contents*
+
+  1. Introduction ........................... |ghostty-mirror-introduction|
+  2. Commands ............................... |ghostty-mirror-commands|
+  3. Configuration .......................... |ghostty-mirror-configuration|
+  4. Health ................................. |ghostty-mirror-health|
+  5. Troubleshooting ........................ |ghostty-mirror-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                   *ghostty-mirror-introduction*
+
+ghostty-mirror mirrors Neovim's active colorscheme into Ghostty, and
+optionally tmux. On `:colorscheme`, it points Ghostty's config-file include at
+a matching theme and signals a reload, so the terminal flips theme instantly
+across every open window.
+
+A theme is resolved by precedence: a hand-made or cached file at
+`themes_dir/<name>` wins (honoring the light variant when 'background' is
+"light"); otherwise one is generated from live highlights and cached. The
+plugin owns only the include file and the themes it generates — never your
+main Ghostty config or hand-made theme files.
+
+Setup is automatic with defaults; call |ghostty-mirror.setup()| to override.
+>lua
+    require("ghostty-mirror").setup({})
+<
+==============================================================================
+2. COMMANDS                                           *ghostty-mirror-commands*
+
+                                                              *:ThemeFromGhostty*
+:ThemeFromGhostty   Apply the colorscheme named in Ghostty's theme file to this
+                    Neovim instance. Run it in other nvim windows to re-sync
+                    them without restarting.
+
+                                                                *:ThemeToGhostty*
+:ThemeToGhostty     Force-regenerate the current colorscheme's Ghostty theme
+                    from live highlights, overwriting any cached/hand-made
+                    file. Useful after tweaking a colorscheme's options.
+
+                                                                  *:ThemeToTmux*
+:ThemeToTmux        The tmux analog of |:ThemeToGhostty| (when tmux mirroring
+                    is enabled).
+
+                                                              *:ThemeCacheClear*
+:ThemeCacheClear    Delete every generated theme file (recognized by their
+                    header); hand-made files are left untouched. The next
+                    `:colorscheme` regenerates fresh.
+
+==============================================================================
+3. CONFIGURATION                                 *ghostty-mirror-configuration*
+
+                                                        *ghostty-mirror.setup()*
+require("ghostty-mirror").setup({opts})
+
+Fields of {opts} (showing defaults):
+
+themes_dir            string   ~/.config/ghostty/themes
+                      Directory Ghostty reads themes from.
+
+theme_file            string   ~/.config/ghostty/theme-current
+                      Include file the plugin writes `theme = <name>` to.
+
+light_variant_suffix  string   "-light"
+                      Suffix for light-mode variant files. "" or false
+                      disables variant routing.
+
+generate              boolean  true
+                      Generate a theme from live highlights when no file
+                      exists. false requires hand-made files.
+
+reload_command        string[] { "pkill", "-SIGUSR2", "ghostty" }
+                      Command used to tell Ghostty to reload its config.
+
+debounce_ms           integer  150
+                      Coalesce rapid `:colorscheme` changes (a picker's live
+                      preview) and mirror once the scheme settles. 0 mirrors
+                      synchronously on every change.
+
+manage_background     boolean  false
+                      Opt-in. Keep 'background' honest across switches:
+                      baseline to dark before a scheme loads (so adaptive
+                      schemes like `default` don't inherit a stale "light")
+                      then sync it to the loaded scheme's Normal-bg luminance.
+                      See |ghostty-mirror-troubleshooting|.
+
+sync_on_startup       boolean  false
+                      Opt-in. On VimEnter, apply the theme named in theme_file
+                      so a freshly-opened nvim follows Ghostty's current theme.
+
+sync_on_focus         boolean  false
+                      Opt-in. On FocusGained, re-apply the theme_file theme
+                      when it differs from the loaded one, so multiple nvim
+                      instances re-sync to whichever last wrote it.
+
+tmux                  table    { enabled = false, ... }
+                      Opt-in tmux statusline mirroring. Fields: enabled,
+                      themes_dir, theme_file, generate, reload_command,
+                      bar_blend, accent_hl, divider_hl. See the README.
+
+==============================================================================
+4. HEALTH                                               *ghostty-mirror-health*
+
+Run >
+    :checkhealth ghostty-mirror
+<
+to diagnose the common, environment-side failure modes: an un-writable
+`themes_dir`/`theme_file`, a `reload_command` not on $PATH, no running Ghostty
+process, and (when tmux mirroring is enabled) an un-writable tmux dir/file or
+tmux missing from $PATH.
+
+==============================================================================
+5. TROUBLESHOOTING                             *ghostty-mirror-troubleshooting*
+
+A "stuck" or desynced theme is almost always the environment, not the plugin
+(which faithfully mirrors the last settled `:colorscheme`). Suspect, in order:
+
+- A colorscheme picker spraying transient previews — the debounce
+  (|ghostty-mirror-configuration| `debounce_ms`) is the fix; check it isn't 0.
+- A config that reads theme_file at startup to pick the colorscheme — that is
+  an input+output feedback loop.
+- Multiple nvim instances sharing one theme_file — last writer wins by design;
+  that is how |:ThemeFromGhostty| re-syncs windows.
+
+A light scheme can leave 'background' stuck: some schemes (catppuccin-latte)
+set `background=light` and never reset it, so an 'background'-adaptive scheme
+loaded afterwards (the built-in `default`) renders its light variant, which
+the plugin faithfully mirrors. Set `manage_background = true` to have the
+plugin reset and re-sync 'background' for you.
+
+==============================================================================
+vim:tw=78:ts=8:et:ft=help:norl:
