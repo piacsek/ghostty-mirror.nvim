@@ -2,21 +2,28 @@
 
 Neovim plugin that mirrors the active colorscheme into [Ghostty](https://ghostty.org):
 on `:colorscheme`, it points Ghostty's config-file include at a matching theme and
-signals a reload. `:ThemeFromGhostty` goes the other way.
+signals a reload. `:ThemeFromGhostty` goes the other way. Targets Neovim **0.10+**
+(uses `vim.uv` and `nvim_get_hl{ link = false }`).
 
 ## Architecture
 
 - `lua/ghostty-mirror/init.lua` — the whole plugin. Single module table `M`, ends with `return M`.
+- `lua/ghostty-mirror/health.lua` — `:checkhealth ghostty-mirror` provider (`M.check`, plus a unit-testable `M.diagnostics` and an overridable `M.ghostty_running`).
 - `plugin/ghostty-mirror.lua` — auto-calls `setup()` with defaults once, guarded by `vim.g.loaded_ghostty_mirror`.
+- `doc/ghostty-mirror.txt` — vimdoc (`:help ghostty-mirror`).
 - `tests/ghostty-mirror_spec.lua` — plenary/busted spec. `tests/minimal_init.lua` bootstraps the runtimepath + plenary.
 
 Public API surface (keep stable): `M.setup`, `M.resolve`, `M.push`, `M.generate`,
-`M.write_generated`, `M.read_current`, `M.pull`, `M.clear_cache`, and `M.config`.
+`M.write_generated`, `M.read_current`, `M.pull`, `M.clear_cache`, `M.current_scheme`,
+and `M.config` (plus the `ghostty-mirror.health` module's `M.check`/`M.diagnostics`/`M.ghostty_running`).
 tmux mirroring (opt-in via `config.tmux.enabled`) adds siblings: `M.generate_tmux`,
 `M.resolve_tmux`, `M.write_tmux_generated`, `M.push_tmux` — structured exactly like
 their Ghostty counterparts (same precedence). The tmux accent is the fg of a
 highlight group (`accent_hl`, default `Type`) so it harmonizes with each scheme's
 hue; the bar blends toward it and the selected-window text is contrast-picked.
+
+Commands: `:ThemeFromGhostty` (pull), `:ThemeToGhostty`/`:ThemeToTmux` (force-push,
+immediate), `:ThemeCacheClear` (delete generated theme files, leaving hand-made ones).
 
 ### How a theme is resolved (precedence)
 
@@ -50,7 +57,7 @@ not a mirror issue.
 - **Annotations:** LuaCATS/EmmyLua on every public function and the config class (`---@class`, `---@field`, `---@param`, `---@return`). Match the existing density.
 - **Comments:** explain *why*, not *what*. Terse. The existing files set the bar.
 - **Neovim APIs:** prefer `vim.uv`, `vim.system`, `vim.api.nvim_*`, `vim.fn.*` over shelling out. Detach long-running subprocesses (`{ detach = true }`).
-- **Config:** all behavior is driven by `M.config` merged from `defaults` via `vim.tbl_deep_extend("force", ...)`. New options need a default, a `---@field` doc, and a README entry.
+- **Config:** all behavior is driven by `M.config` merged from `defaults` via `vim.tbl_deep_extend("force", ...)`. New options need a default, a `---@field` doc, a README entry, and a vimdoc entry.
 - **Fail silently, never wrongly:** when inputs are missing/incomplete, no-op rather than writing something Ghostty can't load or that looks wrong.
 
 ## Testing
@@ -68,7 +75,7 @@ not a mirror issue.
 
 ## Docs
 
-- `README.md` is user-facing and authoritative. Any config option, command, or behavior change must be reflected there (setup block, Usage, How it works).
+- `README.md` is user-facing and authoritative. Any config option, command, or behavior change must be reflected there (setup block, Usage, How it works) **and** in the vimdoc at `doc/ghostty-mirror.txt` — the two must not drift.
 - **Word choice:** prefer "Considerations" over "Caveats" — "caveat" reads as a gotcha/warning, which is off-putting for a plugin. Same for headings and inline ("two considerations", not "two caveats").
 - **No emojis** anywhere — README, release notes, commit messages, headings. Plain text only.
 - **Conciseness beats verbosity.** Keep docs to the point and expose what matters; don't restate the same idea in two places, and cut step-lists that prose covers. Every load-bearing fact stays, but say it once.
