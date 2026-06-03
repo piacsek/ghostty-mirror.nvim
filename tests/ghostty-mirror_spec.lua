@@ -2429,6 +2429,79 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("health: config-file include", function()
+		local function fresh_health()
+			package.loaded["ghostty-mirror.health"] = nil
+			return require("ghostty-mirror.health")
+		end
+
+		---Set up a mirror + health pair where the Ghostty config candidates are
+		---pinned to dir/config, and theme_file to dir/theme-current.
+		local function with_health(dir, config_lines)
+			local mirror = fresh_require()
+			mirror.setup({ themes_dir = dir, theme_file = dir .. "/theme-current", reload_command = { "echo" } })
+			if config_lines then vim.fn.writefile(config_lines, dir .. "/config") end
+			local h = fresh_health()
+			h.ghostty_config_paths = function() return { dir .. "/config" } end
+			return h
+		end
+
+		---The include diagnostic entry, if any.
+		local function include_entry(h)
+			for _, e in ipairs(h.diagnostics()) do
+				if e.msg:find("config-file", 1, true) or e.msg:find("included", 1, true) then return e end
+			end
+		end
+
+		it("reports ok when the config includes theme_file via config-file", function()
+			with_tmp_dir(function(dir)
+				local h = with_health(dir, { "config-file = ?" .. dir .. "/theme-current" })
+				local e = include_entry(h)
+				assert.is_not_nil(e)
+				assert.equals("ok", e.status)
+			end)
+		end)
+
+		it("accepts an include without the optional-? prefix and with extra whitespace", function()
+			with_tmp_dir(function(dir)
+				local h = with_health(dir, { "  config-file   =   " .. dir .. "/theme-current  " })
+				assert.equals("ok", include_entry(h).status)
+			end)
+		end)
+
+		it("resolves an include relative to the config's own directory", function()
+			with_tmp_dir(function(dir)
+				local h = with_health(dir, { "config-file = ?theme-current" })
+				assert.equals("ok", include_entry(h).status)
+			end)
+		end)
+
+		it("warns with the exact line to add when the config lacks the include", function()
+			with_tmp_dir(function(dir)
+				local h = with_health(dir, { "font-family = monospace" })
+				local e = include_entry(h)
+				assert.equals("warn", e.status)
+				assert.is_truthy(e.msg:find("config-file = ?" .. dir .. "/theme-current", 1, true))
+			end)
+		end)
+
+		it("warns when no Ghostty config exists at any candidate path", function()
+			with_tmp_dir(function(dir)
+				local h = with_health(dir, nil)
+				local e = include_entry(h)
+				assert.equals("warn", e.status)
+				assert.is_truthy(e.msg:find("no Ghostty config found", 1, true))
+			end)
+		end)
+
+		it("does not count a commented-out include", function()
+			with_tmp_dir(function(dir)
+				local h = with_health(dir, { "# config-file = ?" .. dir .. "/theme-current" })
+				assert.equals("warn", include_entry(h).status)
+			end)
+		end)
+	end)
+
 	describe("health: ghostty process", function()
 		local function fresh_health()
 			package.loaded["ghostty-mirror.health"] = nil
