@@ -196,11 +196,13 @@ derived from them (bar, pill text contrast, borders) recomputes coherently;
 `bar_blend`).
 
 Override edits apply on the next `:colorscheme` or restart — the cached file
-regenerates and the target reloads automatically. Setup warns about an
-override that can't take effect (unknown theme, unknown param, invalid value);
-a bad value falls back to the highlight-derived color rather than producing a
-broken theme. Overrides apply only to generated themes; a hand-made file is
-never modified (edit it directly instead).
+regenerates and the target reloads automatically. One exception:
+`cursor_color`/`cursor_text` land in the file immediately but Ghostty only
+applies cursor colors on a full restart (see [Cursor color](#cursor-color)).
+Setup warns about an override that can't take effect (unknown theme, unknown
+param, invalid value); a bad value falls back to the highlight-derived color
+rather than producing a broken theme. Overrides apply only to generated
+themes; a hand-made file is never modified (edit it directly instead).
 
 ### Cursor color
 

@@ -98,7 +98,11 @@ overrides             table    {}                    *ghostty-mirror-overrides*
                       scheme's own palette, or are emitted as a partial
                       palette when the scheme owns none. Edits apply on the
                       next |:colorscheme| or restart: the cached file
-                      regenerates and Ghostty reloads. setup() warns about an
+                      regenerates and Ghostty reloads. Exception: Ghostty
+                      applies cursor colors only on a full restart (they are
+                      not re-read on a live config reload), so
+                      cursor_color/cursor_text land in the file immediately
+                      but show after Ghostty restarts. setup() warns about an
                       override that cannot take effect (unknown theme,
                       unknown param, invalid value or palette slot); a bad
                       value falls back to the highlight-derived color.
