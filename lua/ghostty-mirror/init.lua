@@ -11,6 +11,7 @@ local M = {}
 ---@field generate boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
 ---@field reload_command string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
 ---@field debounce_ms integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
+---@field manage_background boolean Opt-in: keep &background honest across :colorscheme switches. Baselines &background to dark before a scheme loads (so &background-adaptive schemes like `default` don't inherit a stale light from a previous light scheme) then syncs it to the loaded scheme's Normal-bg luminance. Defaults to false.
 ---@field tmux GhosttyMirrorTmuxConfig Opt-in tmux statusline mirroring. Disabled by default.
 
 ---@class GhosttyMirrorTmuxConfig
@@ -31,6 +32,7 @@ local defaults = {
 	generate = true,
 	reload_command = { "pkill", "-SIGUSR2", "ghostty" },
 	debounce_ms = 150,
+	manage_background = false,
 	tmux = {
 		enabled = false,
 		themes_dir = vim.fn.expand("~/.config/tmux/themes"),
@@ -516,6 +518,41 @@ function M.setup(opts)
 			schedule_push(ev.match)
 		end,
 	})
+
+	if M.config.manage_background then
+		-- Writing &background re-applies the current scheme (and re-fires these
+		-- events), so guard every write to stop the two hooks looping.
+		local adjusting = false
+		local function set_background(want)
+			if vim.o.background ~= want then
+				adjusting = true
+				vim.o.background = want
+				adjusting = false
+			end
+		end
+
+		-- Baseline to dark before a scheme loads, so &background-adaptive schemes
+		-- (e.g. the built-in `default`) don't inherit a stale "light" left by a
+		-- previous light scheme and render their washed variant.
+		vim.api.nvim_create_autocmd("ColorSchemePre", {
+			group = group,
+			callback = function()
+				if not adjusting then set_background("dark") end
+			end,
+		})
+
+		-- After the scheme settles, sync &background to its actual Normal-bg
+		-- luminance, so a scheme that renders light without setting &background
+		-- itself (e.g. cyberdream-light) ends up light.
+		vim.api.nvim_create_autocmd("ColorScheme", {
+			group = group,
+			callback = function()
+				if adjusting then return end
+				local bg = hex(hl("Normal").bg)
+				if bg then set_background(luminance(bg) > 0.5 and "light" or "dark") end
+			end,
+		})
+	end
 
 	vim.api.nvim_create_user_command("ThemeFromGhostty", M.pull, {
 		desc = "Apply the colorscheme currently set in Ghostty's theme-current file",

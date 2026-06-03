@@ -56,6 +56,7 @@ require("ghostty-mirror").setup({
   generate = true,                                  -- false to require hand-made files
   reload_command = { "pkill", "-SIGUSR2", "ghostty" },
   debounce_ms = 150,                                 -- coalesce rapid switches (e.g. a picker's live preview); 0 = immediate
+  manage_background = false,                         -- opt-in: keep &background honest across switches (see Troubleshooting)
   tmux = { enabled = false },                        -- opt-in tmux statusline mirroring (see below)
 })
 ```
@@ -232,8 +233,8 @@ tmux enabled but not running).
   set `background=light` and never reset it, so an `&background`-adaptive scheme
   loaded afterwards (the built-in `default`) renders its *light* variant — which
   the plugin faithfully mirrors. If `default` looks washed-out after a light
-  scheme, that's the cause. Reset `&background` on `ColorSchemePre`, or set it to
-  match the loaded scheme's Normal-bg luminance on `ColorScheme`.
+  scheme, that's the cause. Set `manage_background = true` to have the plugin
+  handle it, or wire the autocmds yourself.
 
   <details>
   <summary>Autocmds that keep <code>&background</code> honest</summary>

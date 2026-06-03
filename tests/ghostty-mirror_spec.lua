@@ -978,4 +978,50 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 	end)
+
+	describe("manage_background", function()
+		it("brings an adaptive scheme back to dark after a light background", function()
+			with_tmp_dir(function(dir)
+				local saved = vim.o.background
+				local _, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/tc", reload_command = { "echo" }, generate = false, debounce_ms = 0, manage_background = true })
+				vim.o.background = "light"
+				vim.cmd.colorscheme("default")
+				assert.equals("dark", vim.o.background)
+				restore()
+				vim.o.background = saved
+			end)
+		end)
+
+		it("syncs &background to light for a scheme whose Normal is light", function()
+			with_tmp_dir(function(dir)
+				local saved = vim.o.background
+				local _, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/tc", reload_command = { "echo" }, generate = false, debounce_ms = 0, manage_background = true })
+				vim.o.background = "dark"
+				vim.api.nvim_set_hl(0, "Normal", { fg = 0x000000, bg = 0xeeeeee })
+				vim.api.nvim_exec_autocmds("ColorScheme", { group = "ghostty-mirror", pattern = "fake" })
+				assert.equals("light", vim.o.background)
+				restore()
+				vim.o.background = saved
+			end)
+		end)
+
+		it("does not touch &background when disabled (default)", function()
+			with_tmp_dir(function(dir)
+				local saved = vim.o.background
+				local _, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/tc", reload_command = { "echo" }, generate = false, debounce_ms = 0 })
+				vim.o.background = "light"
+				vim.api.nvim_set_hl(0, "Normal", { bg = 0x111111 })
+				vim.api.nvim_exec_autocmds("ColorScheme", { group = "ghostty-mirror", pattern = "fake" })
+				assert.equals("light", vim.o.background)
+				restore()
+				vim.o.background = saved
+			end)
+		end)
+	end)
 end)
