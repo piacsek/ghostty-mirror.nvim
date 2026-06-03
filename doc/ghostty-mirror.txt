@@ -174,5 +174,14 @@ loaded afterwards (the built-in `default`) renders its light variant, which
 the plugin faithfully mirrors. Set `manage_background = true` to have the
 plugin reset and re-sync 'background' for you.
 
+An override that "doesn't work" is usually another layer painting what you
+are looking at. Inside nvim, text, background, Visual selection and the
+cursor come from the colorscheme's highlights, not the theme file. Inside
+tmux, a mouse-drag selection is tmux copy-mode, colored by the generated tmux
+theme's mode-style (from accent). Ghostty's own colors — where overrides
+apply — show at the prompt, in padding, and on a Shift+drag selection (which
+bypasses tmux's mouse reporting). To recolor a layer, change that layer's
+source.
+
 ==============================================================================
 vim:tw=78:ts=8:et:ft=help:norl:

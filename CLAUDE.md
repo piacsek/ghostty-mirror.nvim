@@ -67,6 +67,14 @@ Recovery: kill all nvims, pre-set `theme_file` (+ tmux pointer) to the wanted
 theme, restart. `colors_name == nil` means a colorscheme load aborted upstream —
 not a mirror issue.
 
+An override that "doesn't work" usually *did* land in the theme file — another
+layer is painting the pixel. nvim paints its own cells (Normal/Visual/Cursor),
+tmux copy-mode paints mouse selections (`mode-style`, from the tmux accent);
+Ghostty's colors show at the prompt, padding, and Shift+drag selections. Check
+the generated file first: if the override is in it, the plugin is done and the
+question is which layer renders what the user is looking at. (Cursor colors
+additionally need a full Ghostty restart.)
+
 ## Conventions
 
 - **Indentation:** tabs (see existing files / `.editorconfig` if added).

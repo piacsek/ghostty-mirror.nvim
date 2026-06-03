@@ -204,6 +204,24 @@ param, invalid value); a bad value falls back to the highlight-derived color
 rather than producing a broken theme. Overrides apply only to generated
 themes; a hand-made file is never modified (edit it directly instead).
 
+#### Who paints what
+
+An override that "doesn't work" is usually another layer painting what you're
+looking at. The override always lands in the theme file; whether you *see* it
+depends on who renders that pixel:
+
+| You're looking at | Painted by | Governed by |
+|---|---|---|
+| Text, background, Visual selection, cursor *inside nvim* | nvim | the colorscheme's highlights (`Normal`, `Visual`, `Cursor`) |
+| Mouse-drag selection *inside tmux* | tmux copy-mode | the generated tmux theme's `mode-style` (from `accent`) |
+| Prompt text, padding, Shift+drag selection, anything outside nvim/tmux | Ghostty | the theme file — where overrides apply |
+
+So a `selection_background` override shows on a Shift+drag (bypasses tmux's
+mouse reporting) or in a pane without tmux — a plain drag inside tmux is
+tmux's selection, and Visual mode is nvim's. To recolor a layer, change that
+layer's source: the scheme's highlights for nvim, the tmux `accent` for
+copy-mode, the override for Ghostty.
+
 ### Cursor color
 
 The generated theme includes a `cursor-color`, but **Ghostty only applies it on
