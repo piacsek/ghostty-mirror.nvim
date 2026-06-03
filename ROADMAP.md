@@ -54,12 +54,18 @@ Worked through an external code review (issue #3) end to end:
   generate/clear-cache marker round-trip, the single-reload guarantee of the
   `manage_background` cascade, and the startup-sync immediate branch.
 
-## 0.4.0 — Per-theme tmux overrides (planned)
+## 0.4.0 — Per-theme tmux overrides
 
-Let users tweak the auto-generated tmux theme per colorscheme via config
-(e.g. `tmux = { overrides = { ron = { accent = "#fff" } } }`), merged into
-generation without hand-authoring a whole theme file. Override changes apply
-seamlessly on the next reload; hand-made themes keep winning, untouched.
+Tweak the generated tmux theme per colorscheme via config — e.g.
+`tmux = { overrides = { ron = { accent = "#fff", bar = "#3a0054" } } }` —
+with `accent`, `divider`, `bar`, and `bar_blend` params keyed by resolved
+theme name. The effective overrides are stamped into the generated file, so
+a config edit regenerates the cache and reloads tmux on the next
+`:colorscheme` or restart; setup warns about overrides that can't take
+effect (unknown theme, unknown param, invalid value), and hand-made themes
+keep winning, untouched. Also fixed the startup/focus sync to re-fire the
+mirror chain (`nested` autocmds) and sandboxed `$HOME` in the test suite so
+specs can never touch a real Ghostty/tmux config.
 
 ## 0.5.0 — Ghostty per-theme overrides (planned)
 
