@@ -65,7 +65,7 @@ not a mirror issue.
 How the user likes work to flow — follow it unless told otherwise:
 
 1. **Plan as a concrete task list.** Break the request into small, ordered tasks, each independently testable and committable. Work them top to bottom.
-2. **Drive each task with the `/tdd` skill.** Failing spec first, make it pass, refactor — small increments. Behavior changes start from a test, never from the implementation.
+2. **Drive each task with the `/tdd` skill.** Failing spec first, make it pass, refactor — small increments. Behavior changes start from a test, never from the implementation. Where the skill says the *user* commits checkpoints, this repo overrides it: the agent commits and pushes per task (see below), no need to ask.
 3. **One commit per task.** A task is done when its specs are green (`make test`) and `make lint` is clean. Then, per task:
    - commit with a clear message and **push straight to `main`** — no feature branch or PR (standing preference);
    - update the locally-installed copy so it's testable in the user's running Neovim — installed via `vim.pack` at `~/.local/share/nvim/site/pack/core/opt/ghostty-mirror.nvim`, so `git -C <that path> pull --ff-only origin main`. The user then restarts Neovim (or re-`require`s the module) to load it.
@@ -74,7 +74,7 @@ How the user likes work to flow — follow it unless told otherwise:
 ## Testing
 
 - Run: `make test` (headless nvim + `PlenaryBustedDirectory`). Requires plenary on the runtimepath; `minimal_init.lua` finds it in common locations.
-- Run `make lint` (stylua, config in `stylua.toml`) before pushing; `stylua .` to fix. Both `make test` and `make lint` are the quality gates.
+- Run `make lint` (stylua, config in `stylua.toml`) before pushing; `stylua .` to fix. Both `make test` and `make lint` are the quality gates. On this machine `stylua` lives at `~/.local/share/nvim/mason/bin/stylua` (Mason), not on the default PATH.
 - CI (`.github/workflows/test.yml`) runs `make test` on Neovim **stable** and **nightly**, plus a stylua lint job, for every push to `main` and every PR. Keep them green.
 - **Every behavior change needs a test.** Reuse the spec helpers: `with_tmp_dir`, `fresh_require` (reloads the module for a clean config), `stub_system` (captures reload invocations).
 - Gotcha: setting `vim.o.background` re-applies the colorscheme and clobbers manually-set highlight groups. Set `background` **before** `nvim_set_hl` in test setup.
