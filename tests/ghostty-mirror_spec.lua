@@ -888,6 +888,113 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("setup: ghostty overrides config", function()
+		it("defaults overrides to an empty table", function()
+			local mirror = fresh_require()
+			mirror.setup()
+			assert.same({}, mirror.config.overrides)
+		end)
+
+		it("rejects a non-table overrides, naming the field", function()
+			local mirror = fresh_require()
+			local ok, err = pcall(mirror.setup, { overrides = "nope" })
+			assert.is_false(ok)
+			assert.is_truthy(tostring(err):find("overrides", 1, true))
+		end)
+
+		---Whether a captured WARN notification contains `needle`.
+		local function warned(notes, needle)
+			for _, n in ipairs(notes) do
+				if n.level == vim.log.levels.WARN and n.msg:find(needle, 1, true) then return true end
+			end
+			return false
+		end
+
+		it("notifies on an unknown override param", function()
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { elflord = { bg = "#fff" } } })
+				wait(1)
+				assert.is_true(warned(notes, 'unknown ghostty override param "bg"'))
+			end)
+		end)
+
+		it("notifies on an invalid override color value", function()
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { elflord = { background = "nope" } } })
+				wait(1)
+				assert.is_true(warned(notes, 'invalid ghostty override background value "nope"'))
+			end)
+		end)
+
+		it("notifies on an override keyed by a non-existing colorscheme", function()
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { no_such_scheme_xyzzy = { background = "#fff" } } })
+				wait(1)
+				assert.is_true(warned(notes, 'ghostty override for "no_such_scheme_xyzzy"'))
+			end)
+		end)
+
+		it("does not notify for valid overrides, including a light-variant key", function()
+			with_notify(function(notes)
+				local mirror = fresh_require()
+				mirror.setup({
+					overrides = {
+						elflord = {
+							background = "#101010",
+							foreground = "#ddd",
+							cursor_color = "#ffaabb",
+							cursor_text = "#000000",
+							selection_background = "#333333",
+							selection_foreground = "#ffffff",
+						},
+						["elflord-light"] = { background = "#fafafa" },
+					},
+				})
+				vim.wait(50)
+				assert.same({}, notes)
+			end)
+		end)
+
+		it("notifies on a non-table palette override", function()
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { elflord = { palette = "nope" } } })
+				wait(1)
+				assert.is_true(warned(notes, 'invalid ghostty override palette value "nope"'))
+			end)
+		end)
+
+		it("notifies on an out-of-range palette slot", function()
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { elflord = { palette = { [16] = "#fff" } } } })
+				wait(1)
+				assert.is_true(warned(notes, 'invalid ghostty override palette slot "16"'))
+			end)
+		end)
+
+		it("notifies on an invalid palette slot color", function()
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { elflord = { palette = { [3] = "zzz" } } } })
+				wait(1)
+				assert.is_true(warned(notes, 'invalid ghostty override palette[3] value "zzz"'))
+			end)
+		end)
+
+		it("does not notify for a valid palette override", function()
+			with_notify(function(notes)
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { elflord = { palette = { [0] = "#000", [15] = "#ffffff" } } } })
+				vim.wait(50)
+				assert.same({}, notes)
+			end)
+		end)
+	end)
+
 	describe("setup: tmux override validation", function()
 		---Whether a captured WARN notification contains `needle`.
 		local function warned(notes, needle)

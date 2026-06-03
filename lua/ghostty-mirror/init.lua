@@ -13,6 +13,7 @@ local M = {}
 ---@field generate? boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
 ---@field reload_command? string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
 ---@field debounce_ms? integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
+---@field overrides? table<GhosttyMirrorThemeName, GhosttyMirrorGhosttyOverride> Per-theme tweaks merged into Ghostty theme generation, keyed by resolved theme name (the light variant keys separately, e.g. "ron-light"). Defaults to {}.
 ---@field manage_background? boolean Opt-in: keep &background honest across :colorscheme switches. Baselines &background to dark before a scheme loads (so &background-adaptive schemes like `default` don't inherit a stale light from a previous light scheme) then syncs it to the loaded scheme's Normal-bg luminance. Defaults to false.
 ---@field sync_on_startup? boolean Opt-in: on setup (or VimEnter), apply the colorscheme named in theme_file so a freshly-opened nvim follows Ghostty's current theme. Defaults to false.
 ---@field sync_on_focus? boolean Opt-in: on FocusGained, apply the colorscheme named in theme_file when it differs from the one this instance loaded, so multiple nvim instances re-sync to whichever last wrote the theme. Defaults to false.
@@ -22,6 +23,17 @@ local M = {}
 ---colorscheme's name, or its light variant with `light_variant_suffix`
 ---appended (e.g. "ron", "ron-light"). setup() warns when it matches neither.
 ---@alias GhosttyMirrorThemeName string
+
+-- Lua-friendly underscore params; generation maps them to Ghostty's dashed
+-- directives (cursor_color -> cursor-color).
+---@class GhosttyMirrorGhosttyOverride
+---@field background? string Replaces the Normal-bg-derived background ("#rgb" or "#rrggbb").
+---@field foreground? string Replaces the Normal-fg-derived foreground ("#rgb" or "#rrggbb").
+---@field cursor_color? string Replaces the Cursor-derived cursor-color; emitted even when the highlight lacks one.
+---@field cursor_text? string Replaces the Cursor-fg-derived cursor-text; emitted even when the highlight lacks one.
+---@field selection_background? string Replaces the Visual-bg-derived selection-background; emitted even when the highlight lacks one.
+---@field selection_foreground? string Replaces the Visual-fg-derived selection-foreground; emitted even when the highlight lacks one.
+---@field palette? table<integer, string> Per-slot ANSI palette substitutions, keyed 0..15. Emitted as a partial palette when the scheme owns none.
 
 ---@class GhosttyMirrorThemeOverride
 ---@field accent? string Replaces the accent_hl-derived accent ("#rgb" or "#rrggbb").
@@ -48,6 +60,7 @@ local defaults = {
 	generate = true,
 	reload_command = { "pkill", "-SIGUSR2", "ghostty" },
 	debounce_ms = 150,
+	overrides = {},
 	manage_background = false,
 	sync_on_startup = false,
 	sync_on_focus = false,
@@ -616,6 +629,7 @@ local config_types = {
 	generate = "boolean",
 	reload_command = "table",
 	debounce_ms = "number",
+	overrides = "table",
 	manage_background = "boolean",
 	sync_on_startup = "boolean",
 	sync_on_focus = "boolean",
@@ -649,13 +663,29 @@ local function validate_config(cfg, types, prefix)
 	end
 end
 
--- Recognized per-theme tmux override params and their expected kind.
-local override_params = { accent = "color", divider = "color", bar = "color", bar_blend = "blend" }
+-- Recognized per-theme override params and their expected kind, per side.
+local tmux_override_params = { accent = "color", divider = "color", bar = "color", bar_blend = "blend" }
+local ghostty_override_params = {
+	background = "color",
+	foreground = "color",
+	cursor_color = "color",
+	cursor_text = "color",
+	selection_background = "color",
+	selection_foreground = "color",
+	palette = "palette",
+}
+
+---Whether a value is a usable palette slot index: an integer in 0..15.
+---@param slot any
+---@return boolean
+local function valid_slot(slot) return type(slot) == "number" and slot >= 0 and slot <= 15 and slot % 1 == 0 end
 
 ---Warn (don't error) about override entries that can't take effect: a typo'd
 ---param or a malformed value would otherwise be ignored without a trace.
 ---@param overrides table<string, table>
-local function validate_overrides(overrides)
+---@param params table<string, string> # recognized params for this side
+---@param side string # message prefix naming the side, e.g. "ghostty "
+local function validate_overrides(overrides, params, side)
 	-- Deferred: setup usually runs early in a user config, before a notifier
 	-- plugin (nvim-notify, noice) has replaced vim.notify. Scheduling resolves
 	-- vim.notify after startup, so warnings land in the user's notifier instead
@@ -674,16 +704,33 @@ local function validate_overrides(overrides)
 	for name, entry in pairs(overrides) do
 		local base = suffix and suffix ~= "" and name:sub(-#suffix) == suffix and name:sub(1, -#suffix - 1)
 		if not (known[name] or known[base]) then
-			warn('tmux override for "%s" matches no installed colorscheme', name)
+			warn('%soverride for "%s" matches no installed colorscheme', side, name)
 		end
 		for param, value in pairs(entry) do
-			local kind = override_params[param]
-			local invalid = (kind == "color" and not normalize_color(value))
-				or (kind == "blend" and not valid_blend(value))
+			local kind = params[param]
 			if not kind then
-				warn('unknown tmux override param "%s" for theme "%s"', param, name)
-			elseif invalid then
-				warn('invalid tmux override %s value "%s" for theme "%s"', param, tostring(value), name)
+				warn('unknown %soverride param "%s" for theme "%s"', side, param, name)
+			elseif kind == "palette" and type(value) == "table" then
+				for slot, color in pairs(value) do
+					if not valid_slot(slot) then
+						warn('invalid %soverride palette slot "%s" for theme "%s"', side, tostring(slot), name)
+					elseif not normalize_color(color) then
+						warn(
+							'invalid %soverride palette[%d] value "%s" for theme "%s"',
+							side,
+							slot,
+							tostring(color),
+							name
+						)
+					end
+				end
+			else
+				local invalid = (kind == "color" and not normalize_color(value))
+					or (kind == "blend" and not valid_blend(value))
+					or (kind == "palette" and type(value) ~= "table")
+				if invalid then
+					warn('invalid %soverride %s value "%s" for theme "%s"', side, param, tostring(value), name)
+				end
 			end
 		end
 	end
@@ -701,7 +748,8 @@ function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
 	validate_config(M.config, config_types, "")
 	validate_config(M.config.tmux, tmux_config_types, "tmux.")
-	validate_overrides(M.config.tmux.overrides)
+	validate_overrides(M.config.overrides, ghostty_override_params, "ghostty ")
+	validate_overrides(M.config.tmux.overrides, tmux_override_params, "tmux ")
 
 	-- Re-setup is advertised as idempotent: a debounce armed under the old
 	-- config must not fire a stale push under the new one.
