@@ -635,6 +635,25 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("deletes a file that resolve itself generated (marker round-trip)", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local g, t = dir .. "/g", dir .. "/t"
+					local mirror = fresh_require()
+					mirror.setup({ themes_dir = g, tmux = { enabled = true, themes_dir = t } })
+					assert.equals("mytheme", mirror.resolve("mytheme"))
+					assert.equals("mytheme", mirror.resolve_tmux("mytheme"))
+
+					local cleared = mirror.clear_cache()
+
+					assert.equals(0, vim.fn.filereadable(g .. "/mytheme"))
+					assert.equals(0, vim.fn.filereadable(t .. "/mytheme.conf"))
+					assert.is_true(vim.tbl_contains(cleared, "mytheme"))
+					assert.is_true(vim.tbl_contains(cleared, "mytheme.conf"))
+				end)
+			end)
+		end)
+
 		it("also clears generated tmux theme files, leaving hand-made ones", function()
 			with_tmp_dir(function(dir)
 				local g, t = dir .. "/g", dir .. "/t"
