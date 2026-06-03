@@ -54,8 +54,13 @@ Worked through an external code review (issue #3) end to end:
   generate/clear-cache marker round-trip, the single-reload guarantee of the
   `manage_background` cascade, and the startup-sync immediate branch.
 
-## 0.4.0 — Per-theme overrides (planned)
+## 0.4.0 — Per-theme tmux overrides (planned)
 
-Let users tweak the auto-generated Ghostty/tmux theme per colorscheme via
-config (e.g. `tmux = { overrides = { ron = { accent = "#fff" } } }`), merged
-into generation without hand-authoring a whole theme file.
+Let users tweak the auto-generated tmux theme per colorscheme via config
+(e.g. `tmux = { overrides = { ron = { accent = "#fff" } } }`), merged into
+generation without hand-authoring a whole theme file. Override changes apply
+seamlessly on the next reload; hand-made themes keep winning, untouched.
+
+## 0.5.0 — Ghostty per-theme overrides (planned)
+
+Extend the same override machinery to the Ghostty generation path.
