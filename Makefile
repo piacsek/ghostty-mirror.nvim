@@ -1,4 +1,4 @@
-.PHONY: test
+.PHONY: test lint
 
 # Run the test suite headless. Plenary must be available — either installed
 # system-wide via your plugin manager, or fetched into a vendor pack dir
@@ -6,3 +6,7 @@
 test:
 	nvim --headless --noplugin -u tests/minimal_init.lua \
 		-c "PlenaryBustedDirectory tests { minimal_init = 'tests/minimal_init.lua' }"
+
+# Check formatting with stylua (config in stylua.toml). Run `stylua .` to fix.
+lint:
+	stylua --check lua/ plugin/ tests/

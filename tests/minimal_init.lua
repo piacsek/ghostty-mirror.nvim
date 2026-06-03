@@ -1,10 +1,7 @@
 -- Minimal init for running plenary tests in headless nvim.
 -- The CI workflow clones plenary into ~/.local/share/nvim/site/pack/vendor/start/plenary.nvim.
 
-local plugin_root = vim.fn.fnamemodify(
-	vim.fn.resolve(vim.fn.expand("<sfile>:p:h:h")),
-	":p"
-)
+local plugin_root = vim.fn.fnamemodify(vim.fn.resolve(vim.fn.expand("<sfile>:p:h:h")), ":p")
 vim.opt.rtp:prepend(plugin_root)
 vim.opt.swapfile = false
 

@@ -57,7 +57,8 @@ not a mirror issue.
 
 - **Default workflow: use the `/tdd` skill** to iterate on this repo — write a failing spec first, make it pass, refactor, in small increments. Behavior changes start from a test, not from the implementation.
 - Run: `make test` (headless nvim + `PlenaryBustedDirectory`). Requires plenary on the runtimepath; `minimal_init.lua` finds it in common locations.
-- CI (`.github/workflows/test.yml`) runs `make test` on Neovim **stable** and **nightly** for every push to `main` and every PR. Keep both green.
+- Run `make lint` (stylua, config in `stylua.toml`) before pushing; `stylua .` to fix. Both `make test` and `make lint` are the quality gates.
+- CI (`.github/workflows/test.yml`) runs `make test` on Neovim **stable** and **nightly**, plus a stylua lint job, for every push to `main` and every PR. Keep them green.
 - **Every behavior change needs a test.** Reuse the spec helpers: `with_tmp_dir`, `fresh_require` (reloads the module for a clean config), `stub_system` (captures reload invocations).
 - Gotcha: setting `vim.o.background` re-applies the colorscheme and clobbers manually-set highlight groups. Set `background` **before** `nvim_set_hl` in test setup.
 - Tests mutating global state (`vim.o.background`, `vim.g.terminal_color_*`, highlights) must restore it — other specs depend on defaults.

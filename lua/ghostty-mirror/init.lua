@@ -75,9 +75,7 @@ end
 ---Resolve a highlight group to its effective fg/bg, following links.
 ---@param name string
 ---@return table
-local function hl(name)
-	return vim.api.nvim_get_hl(0, { name = name, link = false })
-end
+local function hl(name) return vim.api.nvim_get_hl(0, { name = name, link = false }) end
 
 ---Channels of a "#rrggbb" color.
 ---@param color string
@@ -116,7 +114,9 @@ end
 ---@return string
 local function readable_on(color, x, y)
 	local lighter, darker = x, y
-	if luminance(y) > luminance(x) then lighter, darker = y, x end
+	if luminance(y) > luminance(x) then
+		lighter, darker = y, x
+	end
 	return luminance(color) < 0.5 and lighter or darker
 end
 
@@ -186,11 +186,15 @@ local function schedule_push(colorscheme)
 	end
 	local timer = vim.uv.new_timer()
 	push_timer = timer
-	timer:start(delay, 0, vim.schedule_wrap(function()
-		timer:close()
-		if push_timer == timer then push_timer = nil end
-		M.push(colorscheme)
-	end))
+	timer:start(
+		delay,
+		0,
+		vim.schedule_wrap(function()
+			timer:close()
+			if push_timer == timer then push_timer = nil end
+			M.push(colorscheme)
+		end)
+	)
 end
 
 ---Name we'd write a generated theme under, honoring the light variant suffix
@@ -339,19 +343,13 @@ function M.resolve_tmux(colorscheme)
 	local light = suffix and suffix ~= "" and vim.o.background == "light"
 	if light then
 		local variant = cfg.themes_dir .. "/" .. colorscheme .. suffix .. ".conf"
-		if vim.uv.fs_stat(variant) then
-			return colorscheme .. suffix
-		end
+		if vim.uv.fs_stat(variant) then return colorscheme .. suffix end
 	end
 	-- Same as `resolve`: a generated bare .conf was built for dark, so don't
 	-- mirror it under a light colorscheme — regenerate the light variant instead.
 	local bare = cfg.themes_dir .. "/" .. colorscheme .. ".conf"
-	if vim.uv.fs_stat(bare) and not (light and is_generated(bare)) then
-		return colorscheme
-	end
-	if cfg.generate then
-		return M.write_tmux_generated(colorscheme)
-	end
+	if vim.uv.fs_stat(bare) and not (light and is_generated(bare)) then return colorscheme end
+	if cfg.generate then return M.write_tmux_generated(colorscheme) end
 	return nil
 end
 
@@ -366,9 +364,7 @@ function M.resolve(colorscheme)
 	local light = cfg.light_variant_suffix and cfg.light_variant_suffix ~= "" and vim.o.background == "light"
 	if light then
 		local variant = cfg.themes_dir .. "/" .. colorscheme .. cfg.light_variant_suffix
-		if vim.uv.fs_stat(variant) then
-			return colorscheme .. cfg.light_variant_suffix
-		end
+		if vim.uv.fs_stat(variant) then return colorscheme .. cfg.light_variant_suffix end
 	end
 	-- The bare <name> file is a valid fallback only when it's hand-made. A
 	-- *generated* bare file was built for a dark background (Normal and
@@ -376,12 +372,8 @@ function M.resolve(colorscheme)
 	-- mirror the dark theme under a light colorscheme. Skip it and regenerate the
 	-- light variant instead.
 	local bare = cfg.themes_dir .. "/" .. colorscheme
-	if vim.uv.fs_stat(bare) and not (light and is_generated(bare)) then
-		return colorscheme
-	end
-	if cfg.generate then
-		return M.write_generated(colorscheme)
-	end
+	if vim.uv.fs_stat(bare) and not (light and is_generated(bare)) then return colorscheme end
+	if cfg.generate then return M.write_generated(colorscheme) end
 	return nil
 end
 
@@ -466,9 +458,7 @@ end
 ---@return string[] # names of the files deleted
 function M.clear_cache()
 	local cleared = clear_generated_in(M.config.themes_dir)
-	if M.config.tmux.enabled then
-		vim.list_extend(cleared, clear_generated_in(M.config.tmux.themes_dir))
-	end
+	if M.config.tmux.enabled then vim.list_extend(cleared, clear_generated_in(M.config.tmux.themes_dir)) end
 	return cleared
 end
 
@@ -488,10 +478,7 @@ end
 function M.pull()
 	local theme = M.read_current()
 	if not theme then
-		vim.notify(
-			"ghostty-mirror: could not read theme from " .. M.config.theme_file,
-			vim.log.levels.WARN
-		)
+		vim.notify("ghostty-mirror: could not read theme from " .. M.config.theme_file, vim.log.levels.WARN)
 		return
 	end
 	vim.cmd.colorscheme(theme)
@@ -502,9 +489,7 @@ end
 ---event match because some schemes set `g:colors_name` to a base name shared
 ---across variants, which would mirror the wrong file.
 ---@return string
-function M.current_scheme()
-	return last_scheme or vim.g.colors_name or ""
-end
+function M.current_scheme() return last_scheme or vim.g.colors_name or "" end
 
 ---@param opts? GhosttyMirrorConfig
 function M.setup(opts)
@@ -566,23 +551,18 @@ function M.setup(opts)
 		desc = "Apply the colorscheme currently set in Ghostty's theme-current file",
 	})
 
-	vim.api.nvim_create_user_command("ThemeToGhostty", function()
-		M.push(M.current_scheme(), { force = true })
-	end, {
+	vim.api.nvim_create_user_command("ThemeToGhostty", function() M.push(M.current_scheme(), { force = true }) end, {
 		desc = "Regenerate the current colorscheme's Ghostty theme from live highlights",
 	})
 
-	vim.api.nvim_create_user_command("ThemeToTmux", function()
-		M.push_tmux(M.current_scheme(), { force = true })
-	end, {
+	vim.api.nvim_create_user_command("ThemeToTmux", function() M.push_tmux(M.current_scheme(), { force = true }) end, {
 		desc = "Regenerate the current colorscheme's tmux theme from live highlights",
 	})
 
 	vim.api.nvim_create_user_command("ThemeCacheClear", function()
 		local cleared = M.clear_cache()
 		vim.notify(
-			("ghostty-mirror: cleared %d generated theme%s")
-				:format(#cleared, #cleared == 1 and "" or "s"),
+			("ghostty-mirror: cleared %d generated theme%s"):format(#cleared, #cleared == 1 and "" or "s"),
 			vim.log.levels.INFO
 		)
 	end, {
@@ -612,9 +592,7 @@ function M.setup(opts)
 			group = group,
 			callback = function()
 				local theme = M.read_current()
-				if theme and theme ~= M.current_scheme() then
-					pcall(vim.cmd.colorscheme, theme)
-				end
+				if theme and theme ~= M.current_scheme() then pcall(vim.cmd.colorscheme, theme) end
 			end,
 		})
 	end
