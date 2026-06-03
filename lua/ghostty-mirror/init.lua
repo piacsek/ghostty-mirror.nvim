@@ -336,6 +336,24 @@ local function serialize_overrides(o)
 	return "# overrides: " .. table.concat(parts, ",")
 end
 
+---Flatten an effective Ghostty override set for stamping: palette slots become
+---palette<N> keys so the stamp stays a single line of scalar pairs.
+---@param o GhosttyMirrorGhosttyOverride
+---@return table<string, string>
+local function flatten_palette(o)
+	local flat = {}
+	for k, v in pairs(o) do
+		if k == "palette" then
+			for slot, color in pairs(v) do
+				flat["palette" .. slot] = color
+			end
+		else
+			flat[k] = v
+		end
+	end
+	return flat
+end
+
 ---Build the lines of a Ghostty theme file from Neovim's *live* highlight state
 ---(the currently loaded colorscheme). Returns nil only when the colorscheme has
 ---no Normal fg/bg to anchor the theme. The highlight-derived colors (background,
@@ -389,6 +407,10 @@ function M.generate(colorscheme)
 			if o.palette[i] then table.insert(lines, "palette = " .. i .. "=" .. o.palette[i]) end
 		end
 	end
+	-- Stamp the overrides that shaped this file so resolve can tell a cache
+	-- generated under a different config from a current one.
+	local stamp = serialize_overrides(flatten_palette(o))
+	if stamp then table.insert(lines, 2, stamp) end
 	return lines
 end
 
