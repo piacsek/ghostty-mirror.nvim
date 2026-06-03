@@ -399,9 +399,24 @@ function M.write_tmux_generated(colorscheme)
 	return name
 end
 
+---Whether a tmux theme file is still the one we'd generate today: hand-made
+---files are always current (the user owns them), a generated file is current
+---only when its override stamp matches the overrides now configured for it.
+---@param path string
+---@param name string # resolved theme name the file serves
+---@return boolean
+local function tmux_cache_current(path, name)
+	if not is_generated(path) then return true end
+	local second = vim.fn.readfile(path, "", 2)[2]
+	local stamp = second ~= nil and vim.startswith(second, "# overrides:") and second or nil
+	return stamp == serialize_overrides(effective_overrides(name))
+end
+
 ---Resolve the tmux theme name for a colorscheme. Same precedence as `resolve`:
 ---a hand-made `<name>.conf` wins (honoring the light variant suffix), otherwise
----one is generated from live highlights and cached.
+---one is generated from live highlights and cached. A generated cache whose
+---override stamp no longer matches the config is regenerated, so override
+---edits take effect on the next push.
 ---@param colorscheme string
 ---@return string|nil
 function M.resolve_tmux(colorscheme)
@@ -409,14 +424,18 @@ function M.resolve_tmux(colorscheme)
 	local cfg = M.config.tmux
 	local suffix = M.config.light_variant_suffix
 	local light = suffix and suffix ~= "" and vim.o.background == "light"
+	-- A stale cache only loses to regeneration when regenerating is possible.
+	local function usable(path, name) return tmux_cache_current(path, name) or not cfg.generate end
 	if light then
 		local variant = cfg.themes_dir .. "/" .. colorscheme .. suffix .. ".conf"
-		if vim.uv.fs_stat(variant) then return colorscheme .. suffix end
+		if vim.uv.fs_stat(variant) and usable(variant, colorscheme .. suffix) then return colorscheme .. suffix end
 	end
 	-- Same as `resolve`: a generated bare .conf was built for dark, so don't
 	-- mirror it under a light colorscheme — regenerate the light variant instead.
 	local bare = cfg.themes_dir .. "/" .. colorscheme .. ".conf"
-	if vim.uv.fs_stat(bare) and not (light and is_generated(bare)) then return colorscheme end
+	if vim.uv.fs_stat(bare) and not (light and is_generated(bare)) and usable(bare, colorscheme) then
+		return colorscheme
+	end
 	if cfg.generate then return M.write_tmux_generated(colorscheme) end
 	return nil
 end
