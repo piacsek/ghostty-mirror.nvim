@@ -107,9 +107,11 @@ tmux.overrides        table    {}                *ghostty-mirror-overrides*
                       Per-theme tweaks merged into tmux theme generation,
                       keyed by the resolved theme name (a light variant keys
                       separately, e.g. "ron-light"). Recognized params:
-                      accent, divider (colors, "#rgb" or "#rrggbb") and
-                      bar_blend (0..1). They replace generation's inputs, so
-                      derived colors recompute coherently. Edits apply on the
+                      accent, divider, bar (colors, "#rgb" or "#rrggbb") and
+                      bar_blend (0..1). accent/divider/bar_blend replace
+                      generation's inputs, so derived colors recompute
+                      coherently; bar sets the status bar color directly,
+                      bypassing the blend (and bar_blend). Edits apply on the
                       next |:colorscheme| or restart: the cached file
                       regenerates and tmux reloads. setup() warns about an
                       override that cannot take effect (unknown theme,

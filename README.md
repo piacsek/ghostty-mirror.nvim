@@ -149,10 +149,11 @@ tmux = {
 ```
 
 Keys are *resolved* theme names, so a light variant gets its own entry
-(`ron-light`). Recognized params: `accent`, `divider` (colors, `#rgb` or
-`#rrggbb`) and `bar_blend` (0..1). They replace the inputs of generation, so
-everything derived from them (bar, pill text contrast, borders) recomputes
-coherently. Override edits apply on the next `:colorscheme` or restart — the
+(`ron-light`). Recognized params: `accent`, `divider`, `bar` (colors, `#rgb`
+or `#rrggbb`) and `bar_blend` (0..1). `accent`/`divider`/`bar_blend` replace
+the inputs of generation, so everything derived from them (bar, pill text
+contrast, borders) recomputes coherently; `bar` sets the status bar color
+directly, bypassing the blend (and `bar_blend`). Override edits apply on the next `:colorscheme` or restart — the
 cached file regenerates and tmux reloads automatically. Setup warns about an
 override that can't take effect (unknown theme, unknown param, invalid value);
 a bad value falls back to the highlight-derived color rather than producing a

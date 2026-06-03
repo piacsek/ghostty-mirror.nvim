@@ -26,7 +26,8 @@ local M = {}
 ---@class GhosttyMirrorThemeOverride
 ---@field accent? string Replaces the accent_hl-derived accent ("#rgb" or "#rrggbb").
 ---@field divider? string Replaces the divider_hl-derived pane border color ("#rgb" or "#rrggbb").
----@field bar_blend? number Replaces tmux.bar_blend for this theme only, 0..1.
+---@field bar? string Sets the status bar color directly, bypassing the blend ("#rgb" or "#rrggbb"). Wins over bar_blend.
+---@field bar_blend? number Replaces tmux.bar_blend for this theme only, 0..1. Ignored when bar is set.
 
 ---@class GhosttyMirrorTmuxConfig
 ---@field enabled? boolean Mirror the colorscheme into tmux's statusline on :colorscheme. Defaults to false (opt-in).
@@ -270,6 +271,7 @@ local function effective_overrides(name)
 	return {
 		accent = normalize_color(entry.accent),
 		divider = normalize_color(entry.divider),
+		bar = normalize_color(entry.bar),
 		bar_blend = valid_blend(entry.bar_blend) and entry.bar_blend or nil,
 	}
 end
@@ -361,7 +363,8 @@ function M.generate_tmux(colorscheme)
 	-- moves and washes out. Selected-window text takes whichever of fg/bg reads
 	-- on the accent.
 	local light = luminance(bg) > 0.5
-	local bar = blend(bg, light and fg or accent, o.bar_blend or cfg.bar_blend)
+	-- An explicit bar override wins outright; bar_blend only shapes the blend.
+	local bar = o.bar or blend(bg, light and fg or accent, o.bar_blend or cfg.bar_blend)
 	local accent_fg = readable_on(accent, fg, bg)
 	local divider = o.divider or hex(hl(cfg.divider_hl).fg) or accent
 
@@ -647,7 +650,7 @@ local function validate_config(cfg, types, prefix)
 end
 
 -- Recognized per-theme tmux override params and their expected kind.
-local override_params = { accent = "color", divider = "color", bar_blend = "blend" }
+local override_params = { accent = "color", divider = "color", bar = "color", bar_blend = "blend" }
 
 ---Warn (don't error) about override entries that can't take effect: a typo'd
 ---param or a malformed value would otherwise be ignored without a trace.

@@ -576,12 +576,38 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("a bar override sets the bar segments directly, bypassing the blend", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({
+					tmux = { enabled = true, overrides = { mytheme = { bar = "#3a0054", bar_blend = 0.5 } } },
+				})
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.is_truthy(joined:find('set %-g status%-style "bg=#3a0054'))
+				assert.is_truthy(joined:find('set %-g status%-left%-style "bg=#3a0054'))
+				assert.is_truthy(joined:find('set %-g window%-status%-style "bg=#3a0054'))
+				assert.is_truthy(joined:find('set %-g message%-style "bg=#3a0054'))
+			end)
+		end)
+
 		it("normalizes a #rgb shorthand color to lowercase #rrggbb", function()
 			with_palette(function()
 				local mirror = fresh_require()
 				mirror.setup({ tmux = { enabled = true, overrides = { mytheme = { accent = "#FfA" } } } })
 				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
 				assert.is_truthy(joined:find('window%-status%-current%-style "bg=#ffffaa'))
+			end)
+		end)
+
+		it("falls back to the blended bar when the bar override color is invalid", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Type", { fg = 0xff00ff })
+				local mirror = fresh_require()
+				mirror.setup({
+					tmux = { enabled = true, bar_blend = 0.25, overrides = { mytheme = { bar = "nope" } } },
+				})
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.equals("#561762", joined:match('status%-style "bg=(#%x%x%x%x%x%x)'))
 			end)
 		end)
 
@@ -677,12 +703,12 @@ describe("ghostty-mirror", function()
 						tmux = {
 							enabled = true,
 							themes_dir = dir,
-							overrides = { elflord = { bar_blend = 0.3, accent = "#FfA" } },
+							overrides = { elflord = { bar_blend = 0.3, accent = "#FfA", bar = "#3a0054" } },
 						},
 					})
 					mirror.write_tmux_generated("elflord")
 					local lines = vim.fn.readfile(dir .. "/elflord.conf")
-					assert.equals("# overrides: accent=#ffffaa,bar_blend=0.3", lines[2])
+					assert.equals("# overrides: accent=#ffffaa,bar=#3a0054,bar_blend=0.3", lines[2])
 				end)
 			end)
 		end)
