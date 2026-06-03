@@ -511,9 +511,52 @@ end
 ---@return string
 function M.current_scheme() return last_scheme or vim.g.colors_name or "" end
 
+-- Expected type per config field; "string|false" admits the disable sentinel.
+-- Hand-rolled (not vim.validate) to stay stable across the 0.11+ signature churn.
+local config_types = {
+	themes_dir = "string",
+	theme_file = "string",
+	light_variant_suffix = "string|false",
+	generate = "boolean",
+	reload_command = "table",
+	debounce_ms = "number",
+	manage_background = "boolean",
+	sync_on_startup = "boolean",
+	sync_on_focus = "boolean",
+	tmux = "table",
+}
+
+local tmux_config_types = {
+	enabled = "boolean",
+	themes_dir = "string",
+	theme_file = "string",
+	generate = "boolean",
+	reload_command = "table|nil",
+	bar_blend = "number",
+	accent_hl = "string",
+	divider_hl = "string",
+}
+
+---Fail fast on a misshapen config (e.g. `tmux = true`) with a clear message,
+---rather than erroring deep inside a later push.
+---@param cfg table
+---@param types table<string, string>
+---@param prefix string
+local function validate_config(cfg, types, prefix)
+	for field, want in pairs(types) do
+		local v = cfg[field]
+		local ok = (want:find(type(v), 1, true) ~= nil) or (want:find("false", 1, true) and v == false)
+		if not ok then
+			error(("ghostty-mirror: config.%s%s must be %s, got %s"):format(prefix, field, want, type(v)), 0)
+		end
+	end
+end
+
 ---@param opts? GhosttyMirrorConfig
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
+	validate_config(M.config, config_types, "")
+	validate_config(M.config.tmux, tmux_config_types, "tmux.")
 
 	-- Re-setup is advertised as idempotent: a debounce armed under the old
 	-- config must not fire a stale push under the new one.
