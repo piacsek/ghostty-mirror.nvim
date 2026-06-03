@@ -142,8 +142,7 @@ hand-authoring a whole file:
 tmux = {
   enabled = true,
   overrides = {
-    ron = { accent = "#fff" },                       -- replaces the accent_hl-derived accent
-    ["ron-light"] = { divider = "#ccc", bar_blend = 0.3 },
+    ron = { accent = "#fff", divider = "#ccc", bar_blend = 0.3 },
   },
 },
 ```
