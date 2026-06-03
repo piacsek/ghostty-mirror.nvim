@@ -25,9 +25,10 @@ local M = {}
 ---@alias GhosttyMirrorThemeName string
 
 -- Lua-friendly underscore params; generation maps them to Ghostty's dashed
--- directives (cursor_color -> cursor-color).
+-- directives (cursor_color -> cursor-color). Deliberately no `background`:
+-- the terminal background diverging from the editor's is exactly the mismatch
+-- the plugin exists to prevent.
 ---@class GhosttyMirrorGhosttyOverride
----@field background? string Replaces the Normal-bg-derived background ("#rgb" or "#rrggbb").
 ---@field foreground? string Replaces the Normal-fg-derived foreground ("#rgb" or "#rrggbb").
 ---@field cursor_color? string Replaces the Cursor-derived cursor-color; emitted even when the highlight lacks one.
 ---@field cursor_text? string Replaces the Cursor-fg-derived cursor-text; emitted even when the highlight lacks one.
@@ -287,7 +288,6 @@ end
 local function ghostty_effective_overrides(name)
 	local entry = M.config.overrides[name] or {}
 	local o = {
-		background = normalize_color(entry.background),
 		foreground = normalize_color(entry.foreground),
 		cursor_color = normalize_color(entry.cursor_color),
 		cursor_text = normalize_color(entry.cursor_text),
@@ -374,7 +374,7 @@ function M.generate(colorscheme)
 
 	local lines = {
 		generated_marker .. " from nvim colorscheme: " .. colorscheme,
-		"background = " .. (o.background or bg),
+		"background = " .. bg,
 		"foreground = " .. (o.foreground or fg),
 	}
 
@@ -755,7 +755,6 @@ end
 -- Recognized per-theme override params and their expected kind, per side.
 local tmux_override_params = { accent = "color", divider = "color", bar = "color", bar_blend = "blend" }
 local ghostty_override_params = {
-	background = "color",
 	foreground = "color",
 	cursor_color = "color",
 	cursor_text = "color",

@@ -22,12 +22,14 @@ their Ghostty counterparts (same precedence). The tmux accent is the fg of a
 highlight group (`accent_hl`, default `Type`) so it harmonizes with each scheme's
 hue; the bar blends toward it and the selected-window text is contrast-picked.
 Per-theme overrides (keyed by resolved name; `cyberdream`/`cyberdream-light` separate) merge
-into generation on both sides: top-level `overrides` for Ghostty — the six emitted
+into generation on both sides: top-level `overrides` for Ghostty — five emitted
 color keys as Lua-friendly underscores mapped to dashed directives
 (`cursor_color` → `cursor-color`; color params replace the highlight-derived value
-and force-emit the conditional directives) plus individual `palette` slots, which
-substitute into an owned palette and emit a partial one when the scheme owns
-none — and `tmux.overrides` for tmux, replacing generation's inputs
+and force-emit the conditional directives; deliberately **no `background`** — the
+terminal background diverging from the editor's is the mismatch the plugin
+exists to prevent) plus individual `palette` slots, which substitute into an
+owned palette and emit a partial one when the scheme owns none — and
+`tmux.overrides` for tmux, replacing generation's inputs
 (`accent`/`divider`/`bar`/`bar_blend`). The effective set is stamped into the
 generated file's header (`# overrides: ...`, palette slots flattened to
 `paletteN`) and both resolvers regenerate on a stamp mismatch — that's how

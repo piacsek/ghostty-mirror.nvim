@@ -438,14 +438,13 @@ describe("ghostty-mirror", function()
 	end)
 
 	describe("generate: overrides", function()
-		it("background and foreground overrides replace the Normal-derived values", function()
+		it("a foreground override replaces the Normal-derived value; background stays the scheme's own", function()
 			with_palette(function()
 				local mirror = fresh_require()
-				mirror.setup({ overrides = { mytheme = { background = "#101010", foreground = "#aabbcc" } } })
+				mirror.setup({ overrides = { mytheme = { foreground = "#aabbcc" } } })
 				local joined = table.concat(mirror.generate("mytheme"), "\n")
-				assert.is_truthy(joined:find("background = #101010", 1, true))
 				assert.is_truthy(joined:find("foreground = #aabbcc", 1, true))
-				assert.is_nil(joined:find("#1e1e2e", 1, true))
+				assert.is_truthy(joined:find("background = #1e1e2e", 1, true))
 				assert.is_nil(joined:find("#cdd6f4", 1, true))
 			end)
 		end)
@@ -499,18 +498,18 @@ describe("ghostty-mirror", function()
 		it("normalizes a #rgb shorthand color to lowercase #rrggbb", function()
 			with_palette(function()
 				local mirror = fresh_require()
-				mirror.setup({ overrides = { mytheme = { background = "#FfA" } } })
+				mirror.setup({ overrides = { mytheme = { foreground = "#FfA" } } })
 				local joined = table.concat(mirror.generate("mytheme"), "\n")
-				assert.is_truthy(joined:find("background = #ffffaa", 1, true))
+				assert.is_truthy(joined:find("foreground = #ffffaa", 1, true))
 			end)
 		end)
 
 		it("falls back to the highlight-derived value when the override color is invalid", function()
 			with_palette(function()
 				local mirror = fresh_require()
-				mirror.setup({ overrides = { mytheme = { background = "nope" } } })
+				mirror.setup({ overrides = { mytheme = { foreground = "nope" } } })
 				local joined = table.concat(mirror.generate("mytheme"), "\n")
-				assert.is_truthy(joined:find("background = #1e1e2e", 1, true))
+				assert.is_truthy(joined:find("foreground = #cdd6f4", 1, true))
 			end)
 		end)
 
@@ -520,12 +519,12 @@ describe("ghostty-mirror", function()
 			local mirror = fresh_require()
 			mirror.setup({
 				overrides = {
-					mytheme = { background = "#111111" },
-					["mytheme-light"] = { background = "#fafafa" },
+					mytheme = { foreground = "#111111" },
+					["mytheme-light"] = { foreground = "#fafafa" },
 				},
 			})
 			local joined = table.concat(mirror.generate("mytheme"), "\n")
-			assert.is_truthy(joined:find("background = #fafafa", 1, true))
+			assert.is_truthy(joined:find("foreground = #fafafa", 1, true))
 			vim.o.background = "dark"
 		end)
 
@@ -864,12 +863,12 @@ describe("ghostty-mirror", function()
 					mirror.setup({
 						themes_dir = dir,
 						overrides = {
-							elflord = { background = "#101010", cursor_color = "#FfA", palette = { [3] = "#cc8800" } },
+							elflord = { foreground = "#101010", cursor_color = "#FfA", palette = { [3] = "#cc8800" } },
 						},
 					})
 					mirror.write_generated("elflord")
 					local lines = vim.fn.readfile(dir .. "/elflord")
-					assert.equals("# overrides: background=#101010,cursor_color=#ffffaa,palette3=#cc8800", lines[2])
+					assert.equals("# overrides: cursor_color=#ffffaa,foreground=#101010,palette3=#cc8800", lines[2])
 				end)
 			end)
 		end)
@@ -890,7 +889,7 @@ describe("ghostty-mirror", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local mirror = fresh_require()
-					mirror.setup({ themes_dir = dir, overrides = { elflord = { background = "#101010" } } })
+					mirror.setup({ themes_dir = dir, overrides = { elflord = { foreground = "#101010" } } })
 					mirror.write_generated("elflord")
 					assert.is_true(vim.tbl_contains(mirror.clear_cache(), "elflord"))
 					assert.equals(0, vim.fn.filereadable(dir .. "/elflord"))
@@ -938,10 +937,10 @@ describe("ghostty-mirror", function()
 					local mirror = fresh_require()
 					mirror.setup({ themes_dir = dir })
 					mirror.write_generated("elflord")
-					mirror.setup({ themes_dir = dir, overrides = { elflord = { background = "#101010" } } })
+					mirror.setup({ themes_dir = dir, overrides = { elflord = { foreground = "#101010" } } })
 					assert.equals("elflord", mirror.resolve("elflord"))
 					local joined = table.concat(vim.fn.readfile(dir .. "/elflord"), "\n")
-					assert.is_truthy(joined:find("background = #101010", 1, true))
+					assert.is_truthy(joined:find("foreground = #101010", 1, true))
 				end)
 			end)
 		end)
@@ -950,7 +949,7 @@ describe("ghostty-mirror", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local mirror = fresh_require()
-					mirror.setup({ themes_dir = dir, overrides = { elflord = { background = "#101010" } } })
+					mirror.setup({ themes_dir = dir, overrides = { elflord = { foreground = "#101010" } } })
 					mirror.write_generated("elflord")
 					mirror.setup({ themes_dir = dir })
 					assert.equals("elflord", mirror.resolve("elflord"))
@@ -966,7 +965,7 @@ describe("ghostty-mirror", function()
 				with_tmp_dir(function(dir)
 					vim.fn.writefile({ "background = #abcdef" }, dir .. "/elflord")
 					local mirror = fresh_require()
-					mirror.setup({ themes_dir = dir, overrides = { elflord = { background = "#101010" } } })
+					mirror.setup({ themes_dir = dir, overrides = { elflord = { foreground = "#101010" } } })
 					assert.equals("elflord", mirror.resolve("elflord"))
 					assert.same({ "background = #abcdef" }, vim.fn.readfile(dir .. "/elflord"))
 				end)
@@ -977,7 +976,7 @@ describe("ghostty-mirror", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local mirror = fresh_require()
-					mirror.setup({ themes_dir = dir, overrides = { elflord = { background = "#101010" } } })
+					mirror.setup({ themes_dir = dir, overrides = { elflord = { foreground = "#101010" } } })
 					mirror.write_generated("elflord")
 					mirror.setup({ themes_dir = dir, generate = false })
 					assert.equals("elflord", mirror.resolve("elflord"))
@@ -1113,7 +1112,7 @@ describe("ghostty-mirror", function()
 					mirror.push("elflord")
 					restore_seed()
 					mirror.setup(
-						vim.tbl_extend("force", base, { overrides = { elflord = { background = "#101010" } } })
+						vim.tbl_extend("force", base, { overrides = { elflord = { foreground = "#101010" } } })
 					)
 					local calls, restore = stub_system()
 					mirror.push("elflord")
@@ -1159,14 +1158,14 @@ describe("ghostty-mirror", function()
 				with_tmp_dir(function(dir)
 					local g = dir .. "/g"
 					vim.fn.mkdir(g, "p")
-					local function config(background, sync)
+					local function config(foreground, sync)
 						return {
 							themes_dir = g,
 							theme_file = dir .. "/g-current",
 							reload_command = { "echo", "ghostty" },
 							debounce_ms = 0,
 							sync_on_startup = sync,
-							overrides = { elflord = { background = background } },
+							overrides = { elflord = { foreground = foreground } },
 						}
 					end
 					-- Previous session: cache generated under the old override,
@@ -1275,19 +1274,28 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("does not recognize background as a param (the one color that must not diverge)", function()
+			with_notify(function(notes, wait)
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { elflord = { background = "#101010" } } })
+				wait(1)
+				assert.is_true(warned(notes, 'unknown ghostty override param "background"'))
+			end)
+		end)
+
 		it("notifies on an invalid override color value", function()
 			with_notify(function(notes, wait)
 				local mirror = fresh_require()
-				mirror.setup({ overrides = { elflord = { background = "nope" } } })
+				mirror.setup({ overrides = { elflord = { foreground = "nope" } } })
 				wait(1)
-				assert.is_true(warned(notes, 'invalid ghostty override background value "nope"'))
+				assert.is_true(warned(notes, 'invalid ghostty override foreground value "nope"'))
 			end)
 		end)
 
 		it("notifies on an override keyed by a non-existing colorscheme", function()
 			with_notify(function(notes, wait)
 				local mirror = fresh_require()
-				mirror.setup({ overrides = { no_such_scheme_xyzzy = { background = "#fff" } } })
+				mirror.setup({ overrides = { no_such_scheme_xyzzy = { foreground = "#fff" } } })
 				wait(1)
 				assert.is_true(warned(notes, 'ghostty override for "no_such_scheme_xyzzy"'))
 			end)
@@ -1299,14 +1307,13 @@ describe("ghostty-mirror", function()
 				mirror.setup({
 					overrides = {
 						elflord = {
-							background = "#101010",
 							foreground = "#ddd",
 							cursor_color = "#ffaabb",
 							cursor_text = "#000000",
 							selection_background = "#333333",
 							selection_foreground = "#ffffff",
 						},
-						["elflord-light"] = { background = "#fafafa" },
+						["elflord-light"] = { foreground = "#1a1a1a" },
 					},
 				})
 				vim.wait(50)

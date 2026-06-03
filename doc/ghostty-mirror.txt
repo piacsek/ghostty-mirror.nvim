@@ -85,11 +85,14 @@ overrides             table    {}                    *ghostty-mirror-overrides*
                       Per-theme tweaks merged into Ghostty theme generation,
                       keyed by the resolved theme name (a light variant keys
                       separately, e.g. "cyberdream-light"). Recognized params:
-                      background, foreground, cursor_color, cursor_text,
+                      foreground, cursor_color, cursor_text,
                       selection_background, selection_foreground (colors,
                       "#rgb" or "#rrggbb"; underscores map to Ghostty's
                       dashed directives) and palette, a table of individual
-                      ANSI slots keyed 0..15. A color param replaces its
+                      ANSI slots keyed 0..15. There is deliberately no
+                      background param: the terminal background diverging
+                      from the editor's is exactly the mismatch the plugin
+                      exists to prevent. A color param replaces its
                       highlight-derived value and is emitted even when the
                       highlight lacks one; palette slots substitute into the
                       scheme's own palette, or are emitted as a partial
@@ -100,7 +103,7 @@ overrides             table    {}                    *ghostty-mirror-overrides*
                       unknown param, invalid value or palette slot); a bad
                       value falls back to the highlight-derived color.
                       Overrides never touch hand-made theme files. Example: >lua
-                          overrides = { ron = { background = "#101010" } }
+                          overrides = { ron = { cursor_color = "#ffaabb" } }
 <
 
 manage_background     boolean  false

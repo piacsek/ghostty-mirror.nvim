@@ -165,7 +165,6 @@ hand-authoring a whole file. Both targets take the same shape: top-level
 require("ghostty-mirror").setup({
   overrides = {
     ron = {
-      background = "#101010",
       cursor_color = "#ffaabb",
       palette = { [3] = "#cc8800" },
     },
@@ -181,12 +180,14 @@ require("ghostty-mirror").setup({
 Keys are *resolved* theme names, so a light variant gets its own entry
 (`cyberdream-light`). Colors are `#rgb` or `#rrggbb`.
 
-Ghostty params: `background`, `foreground`, `cursor_color`, `cursor_text`,
+Ghostty params: `foreground`, `cursor_color`, `cursor_text`,
 `selection_background`, `selection_foreground` (underscores map to Ghostty's
 dashed directives) and `palette`, a table of individual ANSI slots keyed
 0..15. A color param replaces its highlight-derived value and is emitted even
 when the highlight lacks one; palette slots substitute into the scheme's own
 palette, or are emitted as a partial palette when the scheme owns none.
+There's deliberately no `background` param: the terminal background diverging
+from the editor's is exactly the mismatch the plugin exists to prevent.
 
 tmux params: `accent`, `divider`, `bar` (colors) and `bar_blend` (0..1).
 `accent`/`divider`/`bar_blend` replace the inputs of generation, so everything
