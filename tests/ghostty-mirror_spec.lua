@@ -7,7 +7,12 @@ local function with_tmp_dir(fn)
 end
 
 ---Reload the module fresh so each test gets a clean copy with default config.
+---Re-setups the outgoing instance first: that cancels any debounce timer it
+---still has armed (setup's idempotence guarantee), which would otherwise fire
+---a push under its stale config into some later test's capture window.
 local function fresh_require()
+	local old = package.loaded["ghostty-mirror"]
+	if old then pcall(old.setup, { debounce_ms = 0 }) end
 	package.loaded["ghostty-mirror"] = nil
 	return require("ghostty-mirror")
 end
@@ -834,6 +839,55 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("integration: override edit across a restart", function()
+		it("startup sync regenerates a stale-stamped cache and reloads tmux", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local g, t = dir .. "/g", dir .. "/t"
+					vim.fn.mkdir(g, "p")
+					vim.fn.mkdir(t, "p")
+					local function config(accent, sync)
+						return {
+							themes_dir = g,
+							theme_file = dir .. "/g-current",
+							reload_command = { "echo", "ghostty" },
+							debounce_ms = 0,
+							sync_on_startup = sync,
+							tmux = {
+								enabled = true,
+								themes_dir = t,
+								theme_file = dir .. "/t-current.conf",
+								reload_command = { "echo", "tmux" },
+								overrides = { elflord = { accent = accent } },
+							},
+						}
+					end
+					-- Previous session: cache generated under the old override,
+					-- both pointers already name the theme.
+					local mirror = fresh_require()
+					local _, restore_seed = stub_system()
+					mirror.setup(config("#111111", false))
+					mirror.push("elflord")
+					restore_seed()
+					-- "Restart": fresh instance, override edited in config, and
+					-- sync_on_startup re-applies the pointed-at colorscheme.
+					mirror = fresh_require()
+					local calls, restore = stub_system()
+					mirror.setup(config("#222222", true))
+					vim.api.nvim_exec_autocmds("VimEnter", {})
+					restore()
+					local joined = table.concat(vim.fn.readfile(t .. "/elflord.conf"), "\n")
+					assert.is_truthy(joined:find("#222222", 1, true))
+					local reloaded = false
+					for _, c in ipairs(calls) do
+						if c.cmd[2] == "tmux" then reloaded = true end
+					end
+					assert.is_true(reloaded)
+				end)
+			end)
+		end)
+	end)
+
 	describe("setup: tmux override validation", function()
 		---Whether a captured WARN notification contains `needle`.
 		local function warned(notes, needle)
@@ -1209,6 +1263,9 @@ describe("ghostty-mirror", function()
 
 	describe("setup: version floor", function()
 		it("refuses to set up on Neovim older than 0.10, notifying an error", function()
+			-- fresh_require first: it setup()s the outgoing instance, which must
+			-- not see the has/notify stubs below.
+			local mirror = fresh_require()
 			local notices = {}
 			local orig_notify, orig_has = vim.notify, vim.fn.has
 			vim.notify = function(msg, level) table.insert(notices, { msg = msg, level = level }) end ---@diagnostic disable-line: duplicate-set-field
@@ -1216,7 +1273,6 @@ describe("ghostty-mirror", function()
 				if feat == "nvim-0.10" then return 0 end
 				return orig_has(feat)
 			end
-			local mirror = fresh_require()
 			local ok, err = pcall(mirror.setup, { debounce_ms = 5 })
 			vim.notify, vim.fn.has = orig_notify, orig_has
 			assert.is_true(ok, err)
@@ -1860,6 +1916,26 @@ describe("ghostty-mirror", function()
 				vim.api.nvim_exec_autocmds("FocusGained", {})
 				restore()
 				assert.equals("elflord", vim.g.colors_name)
+			end)
+		end)
+
+		it("re-enters the mirror chain, so the synced scheme becomes current_scheme", function()
+			with_tmp_dir(function(dir)
+				local _, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir .. "/themes",
+					theme_file = dir .. "/tc",
+					reload_command = { "echo" },
+					generate = false,
+					debounce_ms = 0,
+					sync_on_focus = true,
+				})
+				vim.cmd.colorscheme("default")
+				vim.fn.writefile({ "theme = elflord" }, dir .. "/tc")
+				vim.api.nvim_exec_autocmds("FocusGained", {})
+				restore()
+				assert.equals("elflord", mirror.current_scheme())
 			end)
 		end)
 

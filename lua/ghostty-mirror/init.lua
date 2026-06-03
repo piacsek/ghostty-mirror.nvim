@@ -798,7 +798,14 @@ function M.setup(opts)
 		if vim.v.vim_did_enter == 1 then
 			startup_sync()
 		else
-			vim.api.nvim_create_autocmd("VimEnter", { group = group, once = true, callback = startup_sync })
+			-- nested: the colorscheme this applies must re-fire the ColorScheme
+			-- autocmd (events are suppressed inside non-nested callbacks), or the
+			-- startup sync never pushes — e.g. an override edited before a restart
+			-- would regenerate nothing until a manual :colorscheme.
+			vim.api.nvim_create_autocmd(
+				"VimEnter",
+				{ group = group, once = true, nested = true, callback = startup_sync }
+			)
 		end
 	end
 
@@ -806,8 +813,12 @@ function M.setup(opts)
 		-- Re-sync to whichever instance last wrote the theme when this window
 		-- regains focus. Only re-apply when it actually differs from what we
 		-- loaded, so a focus in an already-synced window is a no-op.
+		-- nested for the same reason as the startup sync: the applied colorscheme
+		-- must re-fire ColorScheme so the mirror chain (push, stamp check,
+		-- last_scheme) runs for the synced scheme too.
 		vim.api.nvim_create_autocmd("FocusGained", {
 			group = group,
+			nested = true,
 			callback = function()
 				local theme = M.read_current()
 				if theme and theme ~= M.current_scheme() then pcall(vim.cmd.colorscheme, theme) end

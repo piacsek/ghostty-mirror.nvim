@@ -21,3 +21,12 @@ for _, path in ipairs(candidates) do
 end
 
 vim.cmd("runtime plugin/plenary.vim")
+
+-- Sandbox $HOME *after* plenary is on the rtp (the lookups above need the real
+-- one). The plugin's defaults expand ~/.config/... at require time; a spec that
+-- sets only partial paths — or a debounce timer leaking across specs — would
+-- otherwise write into, and reload from, the developer's real Ghostty/tmux
+-- config. With $HOME sandboxed, every default resolves into a throwaway dir.
+local sandbox = vim.fn.tempname() .. "-home"
+vim.fn.mkdir(sandbox, "p")
+vim.env.HOME = sandbox
