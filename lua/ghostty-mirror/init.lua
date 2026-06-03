@@ -25,6 +25,7 @@ local M = {}
 ---@field bar_blend number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
 ---@field accent_hl string Highlight group whose fg is the bright accent (selected window, active divider, status-right). Sourcing it from a highlight lets the accent harmonize with each scheme's own hue. Defaults to "Type".
 ---@field divider_hl string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
+---@field overrides table<string, { accent?: string, divider?: string, bar_blend?: number }> Per-theme tweaks merged into generation, keyed by resolved theme name (the light variant keys separately, e.g. "ron-light"). Colors accept "#rgb"/"#rrggbb". Defaults to {}.
 
 ---@type GhosttyMirrorConfig
 local defaults = {
@@ -46,6 +47,7 @@ local defaults = {
 		bar_blend = 0.22,
 		accent_hl = "Type",
 		divider_hl = "WinSeparator",
+		overrides = {},
 	},
 }
 
@@ -111,6 +113,18 @@ local function blend(a, b, t)
 	local br, bg, bb = rgb(b)
 	local function mix(x, y) return math.floor(x + (y - x) * t + 0.5) end
 	return string.format("#%02x%02x%02x", mix(ar, br), mix(ag, bg), mix(ab, bb))
+end
+
+---Normalize a user-supplied color to lowercase "#rrggbb": expands "#rgb"
+---shorthand, returns nil for anything else so bad values drop silently.
+---@param color any
+---@return string|nil
+local function normalize_color(color)
+	if type(color) ~= "string" then return nil end
+	color = color:lower()
+	local r, g, b = color:match("^#(%x)(%x)(%x)$")
+	if r then return "#" .. r .. r .. g .. g .. b .. b end
+	return color:match("^#%x%x%x%x%x%x$")
 end
 
 ---Return whichever of two candidates reads better on `color`: the lighter one
@@ -284,12 +298,13 @@ function M.generate_tmux(colorscheme)
 	if not bg or not fg then return nil end
 
 	local cfg = M.config.tmux
+	local o = cfg.overrides[target_name(colorscheme)] or {}
 
 	-- The accent can't be inferred from the background, so it's opinionated: a
 	-- syntax highlight group's fg. Sourcing it from a highlight (not a fixed ANSI
 	-- slot) lets it harmonize with the scheme's own hue — magenta-ish on a purple
 	-- theme, blue on a blue one — instead of forcing one hue on every theme.
-	local accent = hex(hl(cfg.accent_hl).fg) or fg
+	local accent = normalize_color(o.accent) or hex(hl(cfg.accent_hl).fg) or fg
 
 	-- The status bar is the background nudged for contrast: on a dark theme,
 	-- toward the accent (stays in-hue and saturated); on a light theme, toward
@@ -297,9 +312,9 @@ function M.generate_tmux(colorscheme)
 	-- moves and washes out. Selected-window text takes whichever of fg/bg reads
 	-- on the accent.
 	local light = luminance(bg) > 0.5
-	local bar = blend(bg, light and fg or accent, cfg.bar_blend)
+	local bar = blend(bg, light and fg or accent, type(o.bar_blend) == "number" and o.bar_blend or cfg.bar_blend)
 	local accent_fg = readable_on(accent, fg, bg)
-	local divider = hex(hl(cfg.divider_hl).fg) or accent
+	local divider = normalize_color(o.divider) or hex(hl(cfg.divider_hl).fg) or accent
 
 	local bar_pair = ("bg=%s,fg=%s"):format(bar, fg)
 	local accent_pair = ("bg=%s,fg=%s"):format(accent, accent_fg)
@@ -535,6 +550,7 @@ local tmux_config_types = {
 	bar_blend = "number",
 	accent_hl = "string",
 	divider_hl = "string",
+	overrides = "table",
 }
 
 ---Fail fast on a misshapen config (e.g. `tmux = true`) with a clear message,
@@ -552,6 +568,39 @@ local function validate_config(cfg, types, prefix)
 	end
 end
 
+-- Recognized per-theme tmux override params and their expected kind.
+local override_params = { accent = "color", divider = "color", bar_blend = "number" }
+
+---Warn (don't error) about override entries that can't take effect: a typo'd
+---param or a malformed value would otherwise be ignored without a trace.
+---@param overrides table<string, table>
+local function validate_overrides(overrides)
+	local function warn(fmt, ...) vim.notify("ghostty-mirror: " .. fmt:format(...), vim.log.levels.WARN) end
+	-- Override keys are *resolved* names: the light variant carries the suffix
+	-- without being a colorscheme of its own, so accept "<scheme><suffix>" too.
+	local known = {}
+	for _, scheme in ipairs(vim.fn.getcompletion("", "color")) do
+		known[scheme] = true
+	end
+	local suffix = M.config.light_variant_suffix
+	for name, entry in pairs(overrides) do
+		local base = suffix and suffix ~= "" and name:sub(-#suffix) == suffix and name:sub(1, -#suffix - 1)
+		if not (known[name] or known[base]) then
+			warn('tmux override for "%s" matches no installed colorscheme', name)
+		end
+		for param, value in pairs(entry) do
+			local kind = override_params[param]
+			local invalid = (kind == "color" and not normalize_color(value))
+				or (kind == "number" and type(value) ~= "number")
+			if not kind then
+				warn('unknown tmux override param "%s" for theme "%s"', param, name)
+			elseif invalid then
+				warn('invalid tmux override %s value "%s" for theme "%s"', param, tostring(value), name)
+			end
+		end
+	end
+end
+
 ---@param opts? GhosttyMirrorConfig
 function M.setup(opts)
 	-- vim.uv and nvim_get_hl{ link = false } need 0.10; bail loudly rather than
@@ -564,6 +613,7 @@ function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
 	validate_config(M.config, config_types, "")
 	validate_config(M.config.tmux, tmux_config_types, "tmux.")
+	validate_overrides(M.config.tmux.overrides)
 
 	-- Re-setup is advertised as idempotent: a debounce armed under the old
 	-- config must not fire a stale push under the new one.

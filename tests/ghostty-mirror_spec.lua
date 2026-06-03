@@ -23,6 +23,16 @@ local function stub_system()
 	return calls, function() vim.system = original end
 end
 
+---Stub vim.notify to capture messages and levels.
+local function stub_notify()
+	local notes = {}
+	local original = vim.notify
+	vim.notify = function(msg, level) ---@diagnostic disable-line: duplicate-set-field
+		table.insert(notes, { msg = msg, level = level })
+	end
+	return notes, function() vim.notify = original end
+end
+
 ---Set a full terminal palette plus Normal/Cursor/Visual highlights so generation
 ---has everything it needs, and return after restoring the palette.
 local function with_palette(fn)
@@ -518,6 +528,167 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("generate_tmux: overrides", function()
+		it("an accent override replaces the accent_hl-derived accent", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, overrides = { mytheme = { accent = "#ff00aa" } } } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.is_truthy(joined:find('window%-status%-current%-style "bg=#ff00aa'))
+				assert.is_truthy(joined:find('pane%-active%-border%-style "fg=#ff00aa'))
+			end)
+		end)
+
+		it("a divider override replaces the divider_hl-derived pane border color", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, overrides = { mytheme = { divider = "#123456" } } } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.is_truthy(joined:find('set %-g pane%-border%-style "fg=#123456"'))
+			end)
+		end)
+
+		it("normalizes a #rgb shorthand color to lowercase #rrggbb", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, overrides = { mytheme = { accent = "#FfA" } } } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.is_truthy(joined:find('window%-status%-current%-style "bg=#ffffaa'))
+			end)
+		end)
+
+		it("falls back to the highlight-derived divider when the override color is invalid", function()
+			with_palette(function()
+				local saved = vim.api.nvim_get_hl(0, { name = "WinSeparator" })
+				vim.api.nvim_set_hl(0, "WinSeparator", { fg = 0x44475a })
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true, overrides = { mytheme = { divider = "nope" } } } })
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				vim.api.nvim_set_hl(0, "WinSeparator", saved)
+				assert.is_truthy(joined:find('set %-g pane%-border%-style "fg=#44475a"'))
+			end)
+		end)
+
+		it("generates the unmodified theme for an empty override table", function()
+			with_palette(function()
+				local notes, restore = stub_notify()
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true } })
+				local plain = mirror.generate_tmux("elflord")
+				mirror.setup({ tmux = { enabled = true, overrides = { elflord = {} } } })
+				local overridden = mirror.generate_tmux("elflord")
+				restore()
+				assert.same(plain, overridden)
+				assert.same({}, notes)
+			end)
+		end)
+
+		it("keys overrides by the resolved name, so the light variant gets its own entry", function()
+			vim.o.background = "light"
+			vim.api.nvim_set_hl(0, "Normal", { fg = 0x000000, bg = 0xe4e4e4 })
+			vim.api.nvim_set_hl(0, "Type", { fg = 0x2e8b57 })
+			local mirror = fresh_require()
+			mirror.setup({
+				tmux = {
+					enabled = true,
+					overrides = {
+						mytheme = { accent = "#111111" },
+						["mytheme-light"] = { accent = "#222222" },
+					},
+				},
+			})
+			local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+			assert.is_truthy(joined:find('window%-status%-current%-style "bg=#222222'))
+			vim.o.background = "dark"
+		end)
+
+		it("falls back to the configured blend when the bar_blend override is not a number", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Type", { fg = 0xff00ff })
+				local mirror = fresh_require()
+				mirror.setup({
+					tmux = { enabled = true, bar_blend = 0.25, overrides = { mytheme = { bar_blend = "half" } } },
+				})
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.equals("#561762", joined:match('status%-style "bg=(#%x%x%x%x%x%x)'))
+			end)
+		end)
+
+		it("a bar_blend override replaces the configured blend amount", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Type", { fg = 0xff00ff })
+				local mirror = fresh_require()
+				mirror.setup({
+					tmux = { enabled = true, bar_blend = 0.25, overrides = { mytheme = { bar_blend = 0.5 } } },
+				})
+				local joined = table.concat(mirror.generate_tmux("mytheme"), "\n")
+				assert.equals("#8f0f97", joined:match('status%-style "bg=(#%x%x%x%x%x%x)'))
+			end)
+		end)
+	end)
+
+	describe("setup: tmux override validation", function()
+		it("notifies on an unknown override param", function()
+			local notes, restore = stub_notify()
+			local mirror = fresh_require()
+			mirror.setup({ tmux = { enabled = true, overrides = { elflord = { acent = "#fff" } } } })
+			restore()
+			local found = false
+			for _, n in ipairs(notes) do
+				if n.level == vim.log.levels.WARN and n.msg:find("acent", 1, true) then found = true end
+			end
+			assert.is_true(found)
+		end)
+
+		it("notifies on an invalid override value", function()
+			local notes, restore = stub_notify()
+			local mirror = fresh_require()
+			mirror.setup({
+				tmux = { enabled = true, overrides = { elflord = { divider = "nope", bar_blend = "half" } } },
+			})
+			restore()
+			local bad_color, bad_blend = false, false
+			for _, n in ipairs(notes) do
+				if n.level == vim.log.levels.WARN and n.msg:find('divider value "nope"', 1, true) then
+					bad_color = true
+				end
+				if n.level == vim.log.levels.WARN and n.msg:find('bar_blend value "half"', 1, true) then
+					bad_blend = true
+				end
+			end
+			assert.is_true(bad_color)
+			assert.is_true(bad_blend)
+		end)
+
+		it("notifies on an override keyed by a non-existing colorscheme", function()
+			local notes, restore = stub_notify()
+			local mirror = fresh_require()
+			mirror.setup({ tmux = { enabled = true, overrides = { no_such_scheme_xyzzy = { accent = "#fff" } } } })
+			restore()
+			local found = false
+			for _, n in ipairs(notes) do
+				if n.level == vim.log.levels.WARN and n.msg:find("no_such_scheme_xyzzy", 1, true) then found = true end
+			end
+			assert.is_true(found)
+		end)
+
+		it("does not notify for valid overrides, including a light-variant key", function()
+			local notes, restore = stub_notify()
+			local mirror = fresh_require()
+			mirror.setup({
+				tmux = {
+					enabled = true,
+					overrides = {
+						elflord = { accent = "#fff", divider = "#123456", bar_blend = 0.3 },
+						["elflord-light"] = { accent = "#000" },
+					},
+				},
+			})
+			restore()
+			assert.same({}, notes)
+		end)
+	end)
+
 	describe("resolve_tmux", function()
 		it("generates and caches a <name>.conf when none exists", function()
 			with_palette(function()
@@ -851,6 +1022,13 @@ describe("ghostty-mirror", function()
 			local ok, err = pcall(mirror.setup, { tmux = { enabled = "yes" } })
 			assert.is_false(ok)
 			assert.is_truthy(tostring(err):find("tmux.enabled", 1, true))
+		end)
+
+		it("rejects a non-table tmux.overrides, naming the field", function()
+			local mirror = fresh_require()
+			local ok, err = pcall(mirror.setup, { tmux = { overrides = "nope" } })
+			assert.is_false(ok)
+			assert.is_truthy(tostring(err):find("tmux.overrides", 1, true))
 		end)
 
 		it("accepts light_variant_suffix = false as the disable sentinel", function()
