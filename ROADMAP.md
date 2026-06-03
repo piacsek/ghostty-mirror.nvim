@@ -81,3 +81,11 @@ no `background` param — the terminal background diverging from the editor's
 is the mismatch the plugin exists to prevent. Docs gained a "Who paints
 what" table mapping each pixel to the layer that owns it (nvim highlights,
 tmux copy-mode, Ghostty).
+
+## 0.5.1 — Health: include wiring
+
+`:checkhealth ghostty-mirror` now detects the most common setup miss: a
+Ghostty config that never reads `theme_file` because the `config-file`
+include line is absent. The check scans the XDG and macOS config locations,
+understands the optional-`?` prefix, quoted values, `~`, and
+config-dir-relative paths, and warns with the exact line to add.
