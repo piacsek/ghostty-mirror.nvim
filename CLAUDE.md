@@ -8,14 +8,15 @@ signals a reload. `:ThemeFromGhostty` goes the other way. Targets Neovim **0.10+
 ## Architecture
 
 - `lua/ghostty-mirror/init.lua` — the whole plugin. Single module table `M`, ends with `return M`.
-- `lua/ghostty-mirror/health.lua` — `:checkhealth ghostty-mirror` provider (`M.check`, plus a unit-testable `M.diagnostics` and an overridable `M.ghostty_running`).
+- `lua/ghostty-mirror/health.lua` — `:checkhealth ghostty-mirror` provider (`M.check`, plus a unit-testable `M.diagnostics` and overridable `M.ghostty_running`/`M.ghostty_config_paths`). Includes the config-file include-wiring check (warns with the exact line to add).
 - `plugin/ghostty-mirror.lua` — auto-calls `setup()` with defaults once, guarded by `vim.g.loaded_ghostty_mirror`.
 - `doc/ghostty-mirror.txt` — vimdoc (`:help ghostty-mirror`).
 - `tests/ghostty-mirror_spec.lua` — plenary/busted spec. `tests/minimal_init.lua` bootstraps the runtimepath + plenary.
 
 Public API surface (keep stable): `M.setup`, `M.resolve`, `M.push`, `M.generate`,
 `M.write_generated`, `M.read_current`, `M.pull`, `M.clear_cache`, `M.current_scheme`,
-and `M.config` (plus the `ghostty-mirror.health` module's `M.check`/`M.diagnostics`/`M.ghostty_running`).
+and `M.config` (plus the `ghostty-mirror.health` module's
+`M.check`/`M.diagnostics`/`M.ghostty_running`/`M.ghostty_config_paths`).
 tmux mirroring (opt-in via `config.tmux.enabled`) adds siblings: `M.generate_tmux`,
 `M.resolve_tmux`, `M.write_tmux_generated`, `M.push_tmux` — structured exactly like
 their Ghostty counterparts (same precedence). The tmux accent is the fg of a

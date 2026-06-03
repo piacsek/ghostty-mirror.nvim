@@ -150,10 +150,11 @@ tmux.overrides        table    {}               *ghostty-mirror-tmux-overrides*
 Run >
     :checkhealth ghostty-mirror
 <
-to diagnose the common, environment-side failure modes: an un-writable
-`themes_dir`/`theme_file`, a `reload_command` not on $PATH, no running Ghostty
-process, and (when tmux mirroring is enabled) an un-writable tmux dir/file or
-tmux missing from $PATH.
+to diagnose the common, environment-side failure modes: a Ghostty config that
+never reads theme_file (no `config-file` include line — the check prints the
+exact line to add), an un-writable `themes_dir`/`theme_file`, a
+`reload_command` not on $PATH, no running Ghostty process, and (when tmux
+mirroring is enabled) an un-writable tmux dir/file or tmux missing from $PATH.
 
 ==============================================================================
 5. TROUBLESHOOTING                             *ghostty-mirror-troubleshooting*
