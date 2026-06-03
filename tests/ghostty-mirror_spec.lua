@@ -811,6 +811,26 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("setup: version floor", function()
+		it("refuses to set up on Neovim older than 0.10, notifying an error", function()
+			local notices = {}
+			local orig_notify, orig_has = vim.notify, vim.fn.has
+			vim.notify = function(msg, level) table.insert(notices, { msg = msg, level = level }) end ---@diagnostic disable-line: duplicate-set-field
+			vim.fn.has = function(feat) ---@diagnostic disable-line: duplicate-set-field
+				if feat == "nvim-0.10" then return 0 end
+				return orig_has(feat)
+			end
+			local mirror = fresh_require()
+			local ok, err = pcall(mirror.setup, { debounce_ms = 5 })
+			vim.notify, vim.fn.has = orig_notify, orig_has
+			assert.is_true(ok, err)
+			assert.are_not.equals(5, mirror.config.debounce_ms)
+			assert.equals(1, #notices)
+			assert.equals(vim.log.levels.ERROR, notices[1].level)
+			assert.is_truthy(notices[1].msg:find("0.10", 1, true))
+		end)
+	end)
+
 	describe("setup: config validation", function()
 		it("rejects a non-table tmux option with a clear error", function()
 			local mirror = fresh_require()

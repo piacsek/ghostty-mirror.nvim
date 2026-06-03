@@ -13,6 +13,8 @@ The colorschemes in the demo are [scintilla.nvim](https://github.com/piacsek/sci
 
 ## Installation
 
+Requires Neovim 0.10+.
+
 ### Step 1 — wire Ghostty to read the theme file
 
 Add this to `~/.config/ghostty/config`:

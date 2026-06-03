@@ -554,6 +554,13 @@ end
 
 ---@param opts? GhosttyMirrorConfig
 function M.setup(opts)
+	-- vim.uv and nvim_get_hl{ link = false } need 0.10; bail loudly rather than
+	-- erroring obscurely on the first colorscheme change.
+	if vim.fn.has("nvim-0.10") ~= 1 then
+		vim.notify("ghostty-mirror requires Neovim 0.10+", vim.log.levels.ERROR)
+		return
+	end
+
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
 	validate_config(M.config, config_types, "")
 	validate_config(M.config.tmux, tmux_config_types, "tmux.")
