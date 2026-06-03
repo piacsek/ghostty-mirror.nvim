@@ -1236,7 +1236,7 @@ describe("ghostty-mirror", function()
 					saved_pal[i] = vim.g["terminal_color_" .. i]
 					vim.g["terminal_color_" .. i] = nil
 				end
-				local _, restore = stub_system()
+				local calls, restore = stub_system()
 				local mirror = fresh_require()
 				mirror.setup({
 					themes_dir = dir .. "/themes",
@@ -1254,6 +1254,7 @@ describe("ghostty-mirror", function()
 				assert.is_not_nil(name)
 				local body = table.concat(vim.fn.readfile(dir .. "/themes/" .. name), "\n")
 				assert.is_truthy(body:find("palette = 0=", 1, true))
+				assert.equals(1, #calls)
 				for i = 0, 15 do
 					vim.g["terminal_color_" .. i] = saved_pal[i]
 				end
