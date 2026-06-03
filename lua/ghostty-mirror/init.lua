@@ -4,28 +4,30 @@
 
 local M = {}
 
+-- Every field is optional ("?"): setup() merges over defaults, so user configs
+-- are partial by design and must not trip lua_ls's missing-fields check.
 ---@class GhosttyMirrorConfig
----@field themes_dir string Directory Ghostty reads themes from. Defaults to ~/.config/ghostty/themes.
----@field theme_file string Path Ghostty reads the active theme from via config-file include. Defaults to ~/.config/ghostty/theme-current.
----@field light_variant_suffix string Suffix used when looking for light-mode variant files (e.g. "cyberdream-light"). Set to "" or false to disable.
----@field generate boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
----@field reload_command string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
----@field debounce_ms integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
----@field manage_background boolean Opt-in: keep &background honest across :colorscheme switches. Baselines &background to dark before a scheme loads (so &background-adaptive schemes like `default` don't inherit a stale light from a previous light scheme) then syncs it to the loaded scheme's Normal-bg luminance. Defaults to false.
----@field sync_on_startup boolean Opt-in: on setup (or VimEnter), apply the colorscheme named in theme_file so a freshly-opened nvim follows Ghostty's current theme. Defaults to false.
----@field sync_on_focus boolean Opt-in: on FocusGained, apply the colorscheme named in theme_file when it differs from the one this instance loaded, so multiple nvim instances re-sync to whichever last wrote the theme. Defaults to false.
----@field tmux GhosttyMirrorTmuxConfig Opt-in tmux statusline mirroring. Disabled by default.
+---@field themes_dir? string Directory Ghostty reads themes from. Defaults to ~/.config/ghostty/themes.
+---@field theme_file? string Path Ghostty reads the active theme from via config-file include. Defaults to ~/.config/ghostty/theme-current.
+---@field light_variant_suffix? string Suffix used when looking for light-mode variant files (e.g. "cyberdream-light"). Set to "" or false to disable.
+---@field generate? boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
+---@field reload_command? string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
+---@field debounce_ms? integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
+---@field manage_background? boolean Opt-in: keep &background honest across :colorscheme switches. Baselines &background to dark before a scheme loads (so &background-adaptive schemes like `default` don't inherit a stale light from a previous light scheme) then syncs it to the loaded scheme's Normal-bg luminance. Defaults to false.
+---@field sync_on_startup? boolean Opt-in: on setup (or VimEnter), apply the colorscheme named in theme_file so a freshly-opened nvim follows Ghostty's current theme. Defaults to false.
+---@field sync_on_focus? boolean Opt-in: on FocusGained, apply the colorscheme named in theme_file when it differs from the one this instance loaded, so multiple nvim instances re-sync to whichever last wrote the theme. Defaults to false.
+---@field tmux? GhosttyMirrorTmuxConfig Opt-in tmux statusline mirroring. Disabled by default.
 
 ---@class GhosttyMirrorTmuxConfig
----@field enabled boolean Mirror the colorscheme into tmux's statusline on :colorscheme. Defaults to false (opt-in).
----@field themes_dir string Directory tmux theme files live in / are cached to. Defaults to ~/.config/tmux/themes.
----@field theme_file string Pointer file tmux sources; the plugin writes `source-file <themes_dir>/<name>.conf` here. Defaults to ~/.config/tmux/theme-current.conf.
----@field generate boolean Generate a tmux theme from live highlights when no hand-made file exists. Defaults to true.
----@field reload_command string[]|nil Command to apply the theme to the running tmux server. nil uses `tmux source-file <theme_file>`.
----@field bar_blend number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
----@field accent_hl string Highlight group whose fg is the bright accent (selected window, active divider, status-right). Sourcing it from a highlight lets the accent harmonize with each scheme's own hue. Defaults to "Type".
----@field divider_hl string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
----@field overrides table<string, { accent?: string, divider?: string, bar_blend?: number }> Per-theme tweaks merged into generation, keyed by resolved theme name (the light variant keys separately, e.g. "ron-light"). Colors accept "#rgb"/"#rrggbb". Defaults to {}.
+---@field enabled? boolean Mirror the colorscheme into tmux's statusline on :colorscheme. Defaults to false (opt-in).
+---@field themes_dir? string Directory tmux theme files live in / are cached to. Defaults to ~/.config/tmux/themes.
+---@field theme_file? string Pointer file tmux sources; the plugin writes `source-file <themes_dir>/<name>.conf` here. Defaults to ~/.config/tmux/theme-current.conf.
+---@field generate? boolean Generate a tmux theme from live highlights when no hand-made file exists. Defaults to true.
+---@field reload_command? string[]|nil Command to apply the theme to the running tmux server. nil uses `tmux source-file <theme_file>`.
+---@field bar_blend? number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
+---@field accent_hl? string Highlight group whose fg is the bright accent (selected window, active divider, status-right). Sourcing it from a highlight lets the accent harmonize with each scheme's own hue. Defaults to "Type".
+---@field divider_hl? string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
+---@field overrides? table<string, { accent?: string, divider?: string, bar_blend?: number }> Per-theme tweaks merged into generation, keyed by resolved theme name (the light variant keys separately, e.g. "ron-light"). Colors accept "#rgb"/"#rrggbb". Defaults to {}.
 
 ---@type GhosttyMirrorConfig
 local defaults = {
