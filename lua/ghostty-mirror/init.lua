@@ -241,6 +241,35 @@ local function target_name(colorscheme)
 	return colorscheme
 end
 
+---The normalized per-theme tmux overrides that actually take effect for a
+---resolved theme name; invalid values are absent so generation falls back.
+---@param name string
+---@return { accent?: string, divider?: string, bar_blend?: number }
+local function effective_overrides(name)
+	local entry = M.config.tmux.overrides[name] or {}
+	return {
+		accent = normalize_color(entry.accent),
+		divider = normalize_color(entry.divider),
+		bar_blend = type(entry.bar_blend) == "number" and entry.bar_blend or nil,
+	}
+end
+
+---Deterministic one-line stamp of an override set (sorted keys, normalized
+---values), embedded in generated files so a config edit is detectable as a
+---stale cache. nil when the set is empty.
+---@param o table<string, string|number>
+---@return string|nil
+local function serialize_overrides(o)
+	local keys = vim.tbl_keys(o)
+	table.sort(keys)
+	local parts = {}
+	for _, k in ipairs(keys) do
+		parts[#parts + 1] = ("%s=%s"):format(k, type(o[k]) == "number" and ("%g"):format(o[k]) or o[k])
+	end
+	if #parts == 0 then return nil end
+	return "# overrides: " .. table.concat(parts, ",")
+end
+
 ---Build the lines of a Ghostty theme file from Neovim's *live* highlight state
 ---(the currently loaded colorscheme). Returns nil only when the colorscheme has
 ---no Normal fg/bg to anchor the theme. The highlight-derived colors (background,
@@ -298,13 +327,13 @@ function M.generate_tmux(colorscheme)
 	if not bg or not fg then return nil end
 
 	local cfg = M.config.tmux
-	local o = cfg.overrides[target_name(colorscheme)] or {}
+	local o = effective_overrides(target_name(colorscheme))
 
 	-- The accent can't be inferred from the background, so it's opinionated: a
 	-- syntax highlight group's fg. Sourcing it from a highlight (not a fixed ANSI
 	-- slot) lets it harmonize with the scheme's own hue — magenta-ish on a purple
 	-- theme, blue on a blue one — instead of forcing one hue on every theme.
-	local accent = normalize_color(o.accent) or hex(hl(cfg.accent_hl).fg) or fg
+	local accent = o.accent or hex(hl(cfg.accent_hl).fg) or fg
 
 	-- The status bar is the background nudged for contrast: on a dark theme,
 	-- toward the accent (stays in-hue and saturated); on a light theme, toward
@@ -312,9 +341,9 @@ function M.generate_tmux(colorscheme)
 	-- moves and washes out. Selected-window text takes whichever of fg/bg reads
 	-- on the accent.
 	local light = luminance(bg) > 0.5
-	local bar = blend(bg, light and fg or accent, type(o.bar_blend) == "number" and o.bar_blend or cfg.bar_blend)
+	local bar = blend(bg, light and fg or accent, o.bar_blend or cfg.bar_blend)
 	local accent_fg = readable_on(accent, fg, bg)
-	local divider = normalize_color(o.divider) or hex(hl(cfg.divider_hl).fg) or accent
+	local divider = o.divider or hex(hl(cfg.divider_hl).fg) or accent
 
 	local bar_pair = ("bg=%s,fg=%s"):format(bar, fg)
 	local accent_pair = ("bg=%s,fg=%s"):format(accent, accent_fg)
@@ -324,7 +353,7 @@ function M.generate_tmux(colorscheme)
 	-- theme status-right stays an accent pill.
 	local right_pair = light and bar_pair or accent_pair
 
-	return {
+	local lines = {
 		generated_marker .. " from nvim colorscheme: " .. colorscheme,
 		('set -g status-style "%s"'):format(bar_pair),
 		('set -g status-left-style "%s"'):format(bar_pair),
@@ -338,6 +367,11 @@ function M.generate_tmux(colorscheme)
 		('set -g mode-style "%s"'):format(accent_pair),
 		('set -g clock-mode-colour "%s"'):format(accent),
 	}
+	-- Stamp the overrides that shaped this file so resolve_tmux can tell a
+	-- cache generated under a different config from a current one.
+	local stamp = serialize_overrides(o)
+	if stamp then table.insert(lines, 2, stamp) end
+	return lines
 end
 
 ---Generate a theme from live highlights and write it to themes_dir.

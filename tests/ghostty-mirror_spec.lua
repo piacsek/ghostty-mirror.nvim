@@ -627,6 +627,38 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("write_tmux_generated: override stamp", function()
+		it("stamps the normalized effective overrides into the generated header", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local mirror = fresh_require()
+					mirror.setup({
+						tmux = {
+							enabled = true,
+							themes_dir = dir,
+							overrides = { elflord = { bar_blend = 0.3, accent = "#FfA" } },
+						},
+					})
+					mirror.write_tmux_generated("elflord")
+					local lines = vim.fn.readfile(dir .. "/elflord.conf")
+					assert.equals("# overrides: accent=#ffffaa,bar_blend=0.3", lines[2])
+				end)
+			end)
+		end)
+
+		it("writes no stamp line when no overrides apply, keeping the legacy format", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local mirror = fresh_require()
+					mirror.setup({ tmux = { enabled = true, themes_dir = dir } })
+					mirror.write_tmux_generated("elflord")
+					local lines = vim.fn.readfile(dir .. "/elflord.conf")
+					assert.is_truthy(vim.startswith(lines[2], "set -g status-style"))
+				end)
+			end)
+		end)
+	end)
+
 	describe("setup: tmux override validation", function()
 		it("notifies on an unknown override param", function()
 			local notes, restore = stub_notify()
