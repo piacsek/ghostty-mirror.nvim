@@ -635,6 +635,16 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("leaves an empty file alone (no marker to match)", function()
+			with_tmp_dir(function(themes_dir)
+				vim.fn.writefile({}, themes_dir .. "/empty")
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = themes_dir })
+				assert.same({}, mirror.clear_cache())
+				assert.equals(1, vim.fn.filereadable(themes_dir .. "/empty"))
+			end)
+		end)
+
 		it("deletes a file that resolve itself generated (marker round-trip)", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
@@ -672,6 +682,25 @@ describe("ghostty-mirror", function()
 				assert.equals(0, vim.fn.filereadable(t .. "/gen.conf"))
 				assert.equals(1, vim.fn.filereadable(t .. "/hand.conf"))
 				assert.is_true(vim.tbl_contains(cleared, "gen.conf"))
+			end)
+		end)
+	end)
+
+	describe("pull", function()
+		it("warns and keeps the current colorscheme when theme_file is unreadable", function()
+			with_tmp_dir(function(dir)
+				local before = vim.g.colors_name
+				local notices = {}
+				local orig_notify = vim.notify
+				vim.notify = function(msg, level) table.insert(notices, { msg = msg, level = level }) end ---@diagnostic disable-line: duplicate-set-field
+				local mirror = fresh_require()
+				mirror.setup({ theme_file = dir .. "/missing", generate = false })
+				mirror.pull()
+				vim.notify = orig_notify
+				assert.equals(before, vim.g.colors_name)
+				assert.equals(1, #notices)
+				assert.equals(vim.log.levels.WARN, notices[1].level)
+				assert.is_truthy(notices[1].msg:find(dir .. "/missing", 1, true))
 			end)
 		end)
 	end)
@@ -722,6 +751,16 @@ describe("ghostty-mirror", function()
 				local mirror = fresh_require()
 				mirror.setup({ theme_file = theme_file })
 				assert.equals("bar", mirror.read_current())
+			end)
+		end)
+
+		it("picks the first directive when multiple theme lines exist", function()
+			with_tmp_dir(function(dir)
+				local theme_file = dir .. "/theme-current"
+				vim.fn.writefile({ "theme = first", "theme = second" }, theme_file)
+				local mirror = fresh_require()
+				mirror.setup({ theme_file = theme_file })
+				assert.equals("first", mirror.read_current())
 			end)
 		end)
 	end)
@@ -1319,6 +1358,45 @@ describe("ghostty-mirror", function()
 				vim.api.nvim_exec_autocmds("VimEnter", {})
 				restore()
 				assert.equals("elflord", vim.g.colors_name)
+			end)
+		end)
+
+		it("applies the theme immediately when setup runs after VimEnter", function()
+			with_tmp_dir(function(dir)
+				vim.fn.writefile({ "theme = elflord" }, dir .. "/tc")
+				local rtp_root =
+					vim.fn.fnamemodify(vim.api.nvim_get_runtime_file("lua/ghostty-mirror/init.lua", false)[1], ":h:h:h")
+				-- +cmds run before VimEnter, so reach the immediate branch by calling
+				-- setup from inside a VimEnter callback: v:vim_did_enter is already 1
+				-- there, and a deferred VimEnter autocmd registered during the event
+				-- would never fire — only the immediate branch can pass this test.
+				local script = dir .. "/setup.lua"
+				vim.fn.writefile({
+					'vim.api.nvim_create_autocmd("VimEnter", {',
+					"	callback = function()",
+					'		assert(vim.v.vim_did_enter == 1, "expected to run after VimEnter")',
+					'		require("ghostty-mirror").setup({',
+					("			themes_dir = %q,"):format(dir .. "/themes"),
+					("			theme_file = %q,"):format(dir .. "/tc"),
+					'			reload_command = { "true" },',
+					"			generate = false,",
+					"			sync_on_startup = true,",
+					"		})",
+					('		vim.fn.writefile({ vim.g.colors_name or "" }, %q)'):format(dir .. "/out"),
+					"		vim.cmd.quitall()",
+					"	end,",
+					"})",
+				}, script)
+				vim.fn.system({
+					vim.v.progpath,
+					"--headless",
+					"--clean",
+					"--cmd",
+					"set rtp+=" .. rtp_root,
+					"--cmd",
+					"luafile " .. script,
+				})
+				assert.same({ "elflord" }, vim.fn.readfile(dir .. "/out"))
 			end)
 		end)
 
