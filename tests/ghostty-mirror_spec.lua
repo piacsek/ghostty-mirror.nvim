@@ -638,6 +638,16 @@ describe("ghostty-mirror", function()
 				assert.equals("spaced", mirror.read_current())
 			end)
 		end)
+
+		it("finds the theme directive even when it is not the first line", function()
+			with_tmp_dir(function(dir)
+				local theme_file = dir .. "/theme-current"
+				vim.fn.writefile({ "# a comment", "", "theme = bar" }, theme_file)
+				local mirror = fresh_require()
+				mirror.setup({ theme_file = theme_file })
+				assert.equals("bar", mirror.read_current())
+			end)
+		end)
 	end)
 
 	describe("setup", function()

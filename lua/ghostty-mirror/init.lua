@@ -453,8 +453,11 @@ end
 ---@return string|nil
 function M.read_current()
 	if vim.fn.filereadable(M.config.theme_file) ~= 1 then return nil end
-	local lines = vim.fn.readfile(M.config.theme_file)
-	return lines[1] and lines[1]:match("theme%s*=%s*(%S+)") or nil
+	for _, line in ipairs(vim.fn.readfile(M.config.theme_file)) do
+		local name = line:match("theme%s*=%s*(%S+)")
+		if name then return name end
+	end
+	return nil
 end
 
 ---Apply the colorscheme stored in Ghostty's theme-current file to this Neovim
