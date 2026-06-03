@@ -57,6 +57,7 @@ require("ghostty-mirror").setup({
   reload_command = { "pkill", "-SIGUSR2", "ghostty" },
   debounce_ms = 150,                                 -- coalesce rapid switches (e.g. a picker's live preview); 0 = immediate
   manage_background = false,                         -- opt-in: keep &background honest across switches (see Troubleshooting)
+  sync_on_startup = false,                           -- opt-in: on launch, apply the theme Ghostty currently points at
   tmux = { enabled = false },                        -- opt-in tmux statusline mirroring (see below)
 })
 ```
@@ -211,9 +212,10 @@ causes (un-writable `themes_dir`/`theme_file`, a `reload_command` not on `$PATH`
 tmux enabled but not running).
 
 - **Initial load.** The plugin doesn't fire on Neovim's startup colorscheme;
-  opening a new nvim window won't reflow every Ghostty window. If you want the
-  startup theme to follow Ghostty (rather than the other way around), read the
-  theme yourself in your config:
+  opening a new nvim window won't reflow every Ghostty window. To have a
+  freshly-opened nvim follow Ghostty's current theme instead, set
+  `sync_on_startup = true` (it applies the theme from `theme_file` on
+  `VimEnter`), or read it yourself:
 
   ```lua
   local lines = vim.fn.readfile(vim.fn.expand("~/.config/ghostty/theme-current"))

@@ -12,6 +12,7 @@ local M = {}
 ---@field reload_command string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
 ---@field debounce_ms integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
 ---@field manage_background boolean Opt-in: keep &background honest across :colorscheme switches. Baselines &background to dark before a scheme loads (so &background-adaptive schemes like `default` don't inherit a stale light from a previous light scheme) then syncs it to the loaded scheme's Normal-bg luminance. Defaults to false.
+---@field sync_on_startup boolean Opt-in: on setup (or VimEnter), apply the colorscheme named in theme_file so a freshly-opened nvim follows Ghostty's current theme. Defaults to false.
 ---@field tmux GhosttyMirrorTmuxConfig Opt-in tmux statusline mirroring. Disabled by default.
 
 ---@class GhosttyMirrorTmuxConfig
@@ -33,6 +34,7 @@ local defaults = {
 	reload_command = { "pkill", "-SIGUSR2", "ghostty" },
 	debounce_ms = 150,
 	manage_background = false,
+	sync_on_startup = false,
 	tmux = {
 		enabled = false,
 		themes_dir = vim.fn.expand("~/.config/tmux/themes"),
@@ -584,6 +586,21 @@ function M.setup(opts)
 	end, {
 		desc = "Delete every generated Ghostty/tmux theme file (hand-made themes are left untouched)",
 	})
+
+	if M.config.sync_on_startup then
+		-- Apply the theme Ghostty currently points at so a freshly-opened nvim
+		-- follows it. Deferred to VimEnter when setup runs during startup, since
+		-- plugin colorschemes aren't loaded yet; run now if we're already past it.
+		-- pcall keeps a missing/uninstalled colorscheme from erroring on launch.
+		local function startup_sync()
+			if M.read_current() then pcall(M.pull) end
+		end
+		if vim.v.vim_did_enter == 1 then
+			startup_sync()
+		else
+			vim.api.nvim_create_autocmd("VimEnter", { group = group, once = true, callback = startup_sync })
+		end
+	end
 end
 
 return M
