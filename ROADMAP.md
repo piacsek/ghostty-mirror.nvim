@@ -35,7 +35,26 @@ and fixed light/dark variant resolution.
 - **Docs and infra** — vimdoc (`:help ghostty-mirror`) and a stylua lint gate
   in CI.
 
-## 0.4.0 — Per-theme overrides (planned)
+## 0.4.0 — Hardening and coverage
+
+Worked through an external code review (issue #3) end to end:
+
+- **Name sanitization** — colorscheme names are gated on a safe character
+  whitelist before reaching filesystem paths, the Ghostty pointer file, or the
+  tmux `source-file` command, closing path-traversal and injection routes.
+- **Config validation** — `setup` fails fast with the offending field's name
+  on a misshapen config (e.g. `tmux = true`) instead of erroring deep inside a
+  later push.
+- **Setup lifecycle** — a pending debounced push is cancelled on re-`setup()`
+  and at shutdown, so stale pushes can't fire under a new config or into a
+  dying editor.
+- **Version floor** — Neovim 0.10+ is enforced at setup with a clear error and
+  documented in README and vimdoc.
+- **Coverage** — the suite grew from 74 to 90 specs, pinning the
+  generate/clear-cache marker round-trip, the single-reload guarantee of the
+  `manage_background` cascade, and the startup-sync immediate branch.
+
+## 0.5.0 — Per-theme overrides (planned)
 
 Let users tweak the auto-generated Ghostty/tmux theme per colorscheme via
 config (e.g. `tmux = { overrides = { ron = { accent = "#fff" } } }`), merged
