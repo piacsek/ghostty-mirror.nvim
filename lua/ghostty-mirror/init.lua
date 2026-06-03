@@ -180,6 +180,15 @@ local push_timer
 -- actually on screen.
 local last_scheme
 
+---Cancel the pending debounced push, if any.
+local function cancel_pending_push()
+	if push_timer then
+		push_timer:stop()
+		push_timer:close()
+		push_timer = nil
+	end
+end
+
 ---Mirror `colorscheme`, debounced by config.debounce_ms. A new change cancels
 ---the pending one, so only the settled scheme is pushed. 0 pushes immediately.
 ---@param colorscheme string
@@ -189,16 +198,16 @@ local function schedule_push(colorscheme)
 		M.push(colorscheme)
 		return
 	end
-	if push_timer then
-		push_timer:stop()
-		push_timer:close()
-	end
+	cancel_pending_push()
 	local timer = vim.uv.new_timer()
 	push_timer = timer
 	timer:start(
 		delay,
 		0,
 		vim.schedule_wrap(function()
+			-- The cancel may have closed this timer while the callback sat in the
+			-- schedule queue; a fired-but-cancelled push must stay cancelled.
+			if timer:is_closing() then return end
 			timer:close()
 			if push_timer == timer then push_timer = nil end
 			M.push(colorscheme)
@@ -506,7 +515,17 @@ function M.current_scheme() return last_scheme or vim.g.colors_name or "" end
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
 
+	-- Re-setup is advertised as idempotent: a debounce armed under the old
+	-- config must not fire a stale push under the new one.
+	cancel_pending_push()
+
 	local group = vim.api.nvim_create_augroup("ghostty-mirror", { clear = true })
+
+	-- A debounce can also be pending at shutdown; don't push into a dying editor.
+	vim.api.nvim_create_autocmd("VimLeavePre", {
+		group = group,
+		callback = cancel_pending_push,
+	})
 
 	vim.api.nvim_create_autocmd("ColorSchemePre", {
 		group = group,

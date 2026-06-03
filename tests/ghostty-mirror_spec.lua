@@ -772,6 +772,58 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("setup: idempotent re-setup", function()
+		it("cancels a pending debounced push from a prior setup", function()
+			with_tmp_dir(function(dir)
+				local themes_dir = dir .. "/themes"
+				local theme_file = dir .. "/theme-current"
+				vim.fn.mkdir(themes_dir, "p")
+				vim.fn.writefile({ "" }, themes_dir .. "/elflord")
+
+				local calls, restore = stub_system()
+				local mirror = fresh_require()
+				local opts = {
+					themes_dir = themes_dir,
+					theme_file = theme_file,
+					reload_command = { "echo" },
+					debounce_ms = 40,
+				}
+				mirror.setup(opts)
+				vim.cmd.colorscheme("elflord")
+				mirror.setup(opts)
+				vim.wait(200, function() return #calls > 0 end)
+				restore()
+
+				assert.equals(0, #calls)
+				assert.equals(0, vim.fn.filereadable(theme_file))
+			end)
+		end)
+		it("cancels a pending debounced push on VimLeavePre", function()
+			with_tmp_dir(function(dir)
+				local themes_dir = dir .. "/themes"
+				local theme_file = dir .. "/theme-current"
+				vim.fn.mkdir(themes_dir, "p")
+				vim.fn.writefile({ "" }, themes_dir .. "/elflord")
+
+				local calls, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = themes_dir,
+					theme_file = theme_file,
+					reload_command = { "echo" },
+					debounce_ms = 40,
+				})
+				vim.cmd.colorscheme("elflord")
+				vim.api.nvim_exec_autocmds("VimLeavePre", { group = "ghostty-mirror" })
+				vim.wait(200, function() return #calls > 0 end)
+				restore()
+
+				assert.equals(0, #calls)
+				assert.equals(0, vim.fn.filereadable(theme_file))
+			end)
+		end)
+	end)
+
 	describe("integration: ColorScheme autocmd", function()
 		it("writes the theme file when :colorscheme fires for a known theme", function()
 			with_tmp_dir(function(dir)
