@@ -275,11 +275,27 @@ local function target_name(colorscheme)
 	return colorscheme
 end
 
+---The normalized per-theme Ghostty overrides that actually take effect for a
+---resolved theme name; invalid values are absent so generation falls back.
+---@param name GhosttyMirrorThemeName
+---@return GhosttyMirrorGhosttyOverride
+local function ghostty_effective_overrides(name)
+	local entry = M.config.overrides[name] or {}
+	return {
+		background = normalize_color(entry.background),
+		foreground = normalize_color(entry.foreground),
+		cursor_color = normalize_color(entry.cursor_color),
+		cursor_text = normalize_color(entry.cursor_text),
+		selection_background = normalize_color(entry.selection_background),
+		selection_foreground = normalize_color(entry.selection_foreground),
+	}
+end
+
 ---The normalized per-theme tmux overrides that actually take effect for a
 ---resolved theme name; invalid values are absent so generation falls back.
 ---@param name GhosttyMirrorThemeName
 ---@return GhosttyMirrorThemeOverride
-local function effective_overrides(name)
+local function tmux_effective_overrides(name)
 	local entry = M.config.tmux.overrides[name] or {}
 	return {
 		accent = normalize_color(entry.accent),
@@ -317,26 +333,30 @@ end
 function M.generate(colorscheme)
 	local normal = hl("Normal")
 	local bg, fg = hex(normal.bg), hex(normal.fg)
+	-- The anchor rule stands even under overrides: they tweak a theme the
+	-- scheme can anchor, they don't bootstrap one from nothing.
 	if not bg or not fg then return nil end
+
+	local o = ghostty_effective_overrides(target_name(colorscheme))
 
 	local lines = {
 		generated_marker .. " from nvim colorscheme: " .. colorscheme,
-		"background = " .. bg,
-		"foreground = " .. fg,
+		"background = " .. (o.background or bg),
+		"foreground = " .. (o.foreground or fg),
 	}
 
 	local cursor = hl("Cursor")
-	local cc = hex(cursor.bg) or hex(cursor.fg)
+	local cc = o.cursor_color or hex(cursor.bg) or hex(cursor.fg)
 	if cc then table.insert(lines, "cursor-color = " .. cc) end
 	-- cursor-text is the glyph color under the block cursor; only meaningful when
 	-- the cursor owns a bg (so cursor-color above came from bg, not from fg).
-	local ct = hex(cursor.fg)
-	if ct and cursor.bg then table.insert(lines, "cursor-text = " .. ct) end
+	local ct = o.cursor_text or (cursor.bg and hex(cursor.fg))
+	if ct then table.insert(lines, "cursor-text = " .. ct) end
 
 	local visual = hl("Visual")
-	local sel = hex(visual.bg)
+	local sel = o.selection_background or hex(visual.bg)
 	if sel then table.insert(lines, "selection-background = " .. sel) end
-	local sel_fg = hex(visual.fg)
+	local sel_fg = o.selection_foreground or hex(visual.fg)
 	if sel_fg then table.insert(lines, "selection-foreground = " .. sel_fg) end
 
 	local palette = snapshot_palette()
@@ -362,7 +382,7 @@ function M.generate_tmux(colorscheme)
 	if not bg or not fg then return nil end
 
 	local cfg = M.config.tmux
-	local o = effective_overrides(target_name(colorscheme))
+	local o = tmux_effective_overrides(target_name(colorscheme))
 
 	-- The accent can't be inferred from the background, so it's opinionated: a
 	-- syntax highlight group's fg. Sourcing it from a highlight (not a fixed ANSI
@@ -445,7 +465,7 @@ local function tmux_cache_current(path, name)
 	if not is_generated(path) then return true end
 	local second = vim.fn.readfile(path, "", 2)[2]
 	local stamp = second ~= nil and vim.startswith(second, "# overrides:") and second or nil
-	return stamp == serialize_overrides(effective_overrides(name))
+	return stamp == serialize_overrides(tmux_effective_overrides(name))
 end
 
 ---Resolve the tmux theme name for a colorscheme. Same precedence as `resolve`:

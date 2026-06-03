@@ -437,6 +437,114 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("generate: overrides", function()
+		it("background and foreground overrides replace the Normal-derived values", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { mytheme = { background = "#101010", foreground = "#aabbcc" } } })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("background = #101010", 1, true))
+				assert.is_truthy(joined:find("foreground = #aabbcc", 1, true))
+				assert.is_nil(joined:find("#1e1e2e", 1, true))
+				assert.is_nil(joined:find("#cdd6f4", 1, true))
+			end)
+		end)
+
+		it("maps underscore params onto the dashed cursor and selection directives", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Visual", { bg = 0x45475a, fg = 0xcdd6f4 })
+				vim.api.nvim_set_hl(0, "Cursor", { bg = 0xf5e0dc, fg = 0x1e1e2e })
+				local mirror = fresh_require()
+				mirror.setup({
+					overrides = {
+						mytheme = {
+							cursor_color = "#ffaabb",
+							cursor_text = "#001122",
+							selection_background = "#334455",
+							selection_foreground = "#667788",
+						},
+					},
+				})
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("cursor-color = #ffaabb", 1, true))
+				assert.is_truthy(joined:find("cursor-text = #001122", 1, true))
+				assert.is_truthy(joined:find("selection-background = #334455", 1, true))
+				assert.is_truthy(joined:find("selection-foreground = #667788", 1, true))
+			end)
+		end)
+
+		it("force-emits a conditional directive the highlight alone would omit", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Cursor", {})
+				vim.api.nvim_set_hl(0, "Visual", {})
+				local mirror = fresh_require()
+				mirror.setup({
+					overrides = {
+						mytheme = {
+							cursor_color = "#ffaabb",
+							cursor_text = "#001122",
+							selection_background = "#334455",
+							selection_foreground = "#667788",
+						},
+					},
+				})
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("cursor-color = #ffaabb", 1, true))
+				assert.is_truthy(joined:find("cursor-text = #001122", 1, true))
+				assert.is_truthy(joined:find("selection-background = #334455", 1, true))
+				assert.is_truthy(joined:find("selection-foreground = #667788", 1, true))
+			end)
+		end)
+
+		it("normalizes a #rgb shorthand color to lowercase #rrggbb", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { mytheme = { background = "#FfA" } } })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("background = #ffffaa", 1, true))
+			end)
+		end)
+
+		it("falls back to the highlight-derived value when the override color is invalid", function()
+			with_palette(function()
+				local mirror = fresh_require()
+				mirror.setup({ overrides = { mytheme = { background = "nope" } } })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("background = #1e1e2e", 1, true))
+			end)
+		end)
+
+		it("keys overrides by the resolved name, so the light variant gets its own entry", function()
+			vim.o.background = "light"
+			vim.api.nvim_set_hl(0, "Normal", { fg = 0x000000, bg = 0xe4e4e4 })
+			local mirror = fresh_require()
+			mirror.setup({
+				overrides = {
+					mytheme = { background = "#111111" },
+					["mytheme-light"] = { background = "#fafafa" },
+				},
+			})
+			local joined = table.concat(mirror.generate("mytheme"), "\n")
+			assert.is_truthy(joined:find("background = #fafafa", 1, true))
+			vim.o.background = "dark"
+		end)
+
+		it("generates the unmodified theme for an empty override table", function()
+			with_palette(function()
+				with_notify(function(notes)
+					local mirror = fresh_require()
+					mirror.setup({})
+					local plain = mirror.generate("elflord")
+					mirror.setup({ overrides = { elflord = {} } })
+					local overridden = mirror.generate("elflord")
+					vim.wait(50)
+					assert.same(plain, overridden)
+					assert.same({}, notes)
+				end)
+			end)
+		end)
+	end)
+
 	describe("generate_tmux", function()
 		it("emits status, window and pane-border styles anchored on Normal", function()
 			with_palette(function()
