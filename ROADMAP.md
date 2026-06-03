@@ -1,6 +1,6 @@
 # Roadmap
 
-Released milestones for ghostty-mirror.nvim.
+Released milestones for ghostty-mirror.nvim (newest planned work at the bottom).
 
 ## 0.1.0 — Theme auto-generation
 
@@ -34,3 +34,9 @@ and fixed light/dark variant resolution.
   now detects a running Ghostty.
 - **Docs and infra** — vimdoc (`:help ghostty-mirror`) and a stylua lint gate
   in CI.
+
+## 0.4.0 — Per-theme overrides (planned)
+
+Let users tweak the auto-generated Ghostty/tmux theme per colorscheme via
+config (e.g. `tmux = { overrides = { ron = { accent = "#fff" } } }`), merged
+into generation without hand-authoring a whole theme file.
