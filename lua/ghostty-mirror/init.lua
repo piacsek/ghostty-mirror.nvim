@@ -757,7 +757,12 @@ function M.push_tmux(colorscheme, opts)
 end
 
 ---Delete every generated file (first line is the generated marker) from a dir,
----leaving hand-made files untouched. Missing dirs are skipped.
+---leaving hand-made files untouched. Missing dirs are skipped. The marker
+---check and the delete are two separate path lookups, so a racer swapping the
+---file between them could lose a non-generated file. Accepted: luv exposes no
+---unlinkat, so the window can only be narrowed, never closed, and the blast
+---radius stays confined to the themes dirs (the vim.fs.dir type == "file"
+---gate already excludes symlinks).
 ---@param dir string
 ---@return string[]
 local function clear_generated_in(dir)

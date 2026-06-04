@@ -24,7 +24,9 @@ plugin owns only the include file and the themes it generates — never your
 main Ghostty config or hand-made theme files. It also refuses to write
 through a symlink at any of its destinations (the include files and theme
 cache paths), so keep those as regular files — a symlinked parent directory
-is fine.
+is fine. The directories themselves are trusted as configured: the symlink
+refusal guards the files, not where their directories point, so writes and
+cache deletions follow wherever the configured paths lead.
 
 Requires Neovim 0.10+.
 
@@ -134,7 +136,11 @@ sync_on_startup       boolean  false
 sync_on_focus         boolean  false
                       Opt-in. On FocusGained, re-apply the theme_file theme
                       when it differs from the loaded one, so multiple nvim
-                      instances re-sync to whichever last wrote it.
+                      instances re-sync to whichever last wrote it. One
+                      consideration for both sync options: they trust whatever
+                      can write theme_file — a name written there is applied
+                      as a colorscheme automatically (limited to installed
+                      schemes).
 
 tmux                  table    { enabled = false, ... }
                       Opt-in tmux statusline mirroring. Fields: enabled,

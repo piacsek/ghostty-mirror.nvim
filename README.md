@@ -75,7 +75,10 @@ require("ghostty-mirror").setup({
   in sync without restarting them. Set `sync_on_focus = true` to do this
   automatically whenever a window regains focus. Inside tmux this needs
   `set -g focus-events on` in your `tmux.conf`, otherwise tmux swallows the
-  focus events and panes won't re-sync on switch.
+  focus events and panes won't re-sync on switch. One consideration: either
+  sync option trusts whatever can write `theme_file` — a name written there
+  is applied as a colorscheme automatically (limited to schemes you have
+  installed).
 - `:ThemeToGhostty` → force-regenerate the current colorscheme's theme from
   live highlights, overwriting any cached/hand-made file. Handy after you
   tweak a colorscheme's options and want Ghostty to pick up the new colors.
@@ -287,7 +290,9 @@ The plugin owns *only* the include file and the themes it generates — never yo
 main Ghostty config or hand-made theme files. It also refuses to write through
 a symlink at any of its destinations (the include files and theme cache paths),
 so keep those as regular files — a symlinked parent directory (a dotfiles-style
-`~/.config/ghostty` link) is fine.
+`~/.config/ghostty` link) is fine. The directories themselves are trusted as
+configured: the symlink refusal guards the files, not where their directories
+point, so writes and cache deletions follow wherever the configured paths lead.
 
 ### Light/dark variants
 
