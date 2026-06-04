@@ -9,15 +9,15 @@ on:
 permissions:
   contents: read
 
+# Every action (and the plenary clone below) is pinned to a commit SHA so a
+# moved tag can't swap in different code under us.
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Check formatting with stylua
-        # Third-party actions are pinned to commit SHAs so a moved tag can't
-        # swap in different code under us.
         uses: JohnnyMorganz/stylua-action@479972f01e665acfcba96ada452c36608bdbbb5e # v4.1.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -31,7 +31,7 @@ jobs:
         nvim: ["stable", "nightly"]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Neovim
         uses: rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1.6.1
@@ -40,10 +40,13 @@ jobs:
           version: ${{ matrix.nvim }}
 
       - name: Install plenary.nvim
+        # Pinned: plenary's Lua executes in this job, so don't run whatever
+        # its HEAD happens to be.
         run: |
-          mkdir -p ~/.local/share/nvim/site/pack/vendor/start
-          git clone --depth 1 https://github.com/nvim-lua/plenary.nvim \
-            ~/.local/share/nvim/site/pack/vendor/start/plenary.nvim
+          dir=~/.local/share/nvim/site/pack/vendor/start/plenary.nvim
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/nvim-lua/plenary.nvim 74b06c6c75e4eeb3108ec01852001636d85a932b
+          git -C "$dir" checkout -q FETCH_HEAD
 
       - name: Run tests
         run: make test
