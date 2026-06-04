@@ -1970,6 +1970,18 @@ describe("ghostty-mirror", function()
 			mirror.setup({ light_variant_suffix = false })
 			assert.equals(false, mirror.config.light_variant_suffix)
 		end)
+
+		it("rejects a light_variant_suffix carrying path or quoting characters, naming the field", function()
+			-- The suffix is appended to an already-validated colorscheme name and
+			-- flows into file paths and the Ghostty/tmux pointer lines, so it must
+			-- pass the same character class as the name itself.
+			for _, suffix in ipairs({ "/evil", "\ncommand = oops", '"', "-li ght" }) do
+				local mirror = fresh_require()
+				local ok, err = pcall(mirror.setup, { light_variant_suffix = suffix })
+				assert.is_false(ok, ("suffix %q was accepted"):format(suffix))
+				assert.is_truthy(tostring(err):find("light_variant_suffix", 1, true))
+			end
+		end)
 	end)
 
 	describe("setup: idempotent re-setup", function()

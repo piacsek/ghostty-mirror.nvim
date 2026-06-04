@@ -9,7 +9,7 @@ local M = {}
 ---@class GhosttyMirrorConfig
 ---@field themes_dir? string Directory Ghostty reads themes from. Defaults to ~/.config/ghostty/themes.
 ---@field theme_file? string Path Ghostty reads the active theme from via config-file include. Defaults to ~/.config/ghostty/theme-current.
----@field light_variant_suffix? string Suffix used when looking for light-mode variant files (e.g. "cyberdream-light"). Set to "" or false to disable.
+---@field light_variant_suffix? string Suffix used when looking for light-mode variant files (e.g. "cyberdream-light"). Letters, digits, '.', '_' and '-' only; setup() errors otherwise. Set to "" or false to disable.
 ---@field generate? boolean When no theme file exists for a colorscheme, generate one on the fly from Neovim's live highlights and terminal_color_* palette, caching it to themes_dir. Skips silently if the palette is incomplete. Defaults to true.
 ---@field reload_command? string[] Command + args used to tell Ghostty to reload its config. Defaults to `pkill -SIGUSR2 ghostty`.
 ---@field debounce_ms? integer Coalesce rapid :colorscheme changes (e.g. a picker's live preview) and only mirror once the scheme settles, this many ms after the last change. 0 mirrors synchronously on every change. Defaults to 150.
@@ -879,6 +879,18 @@ function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
 	validate_config(M.config, config_types, "")
 	validate_config(M.config.tmux, tmux_config_types, "tmux.")
+	-- The suffix is appended to an already-validated colorscheme name, flowing
+	-- into the same paths and pointer-file lines, so it must pass the same
+	-- character class as the name itself ("" and false stay valid as disables).
+	local suffix = M.config.light_variant_suffix
+	if suffix and suffix ~= "" and not suffix:match("^[%w._%-]+$") then
+		error(
+			("ghostty-mirror: config.light_variant_suffix must contain only letters, digits, '.', '_' or '-', got %q"):format(
+				suffix
+			),
+			0
+		)
+	end
 	validate_overrides(M.config.overrides, ghostty_override_params, "ghostty ")
 	validate_overrides(M.config.tmux.overrides, tmux_override_params, "tmux ")
 

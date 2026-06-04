@@ -70,7 +70,9 @@ theme_file            string   ~/.config/ghostty/theme-current
 
 light_variant_suffix  string   "-light"
                       Suffix for light-mode variant files. "" or false
-                      disables variant routing.
+                      disables variant routing. Letters, digits, ".", "_"
+                      and "-" only (it becomes part of file names and the
+                      pointer lines); setup() errors otherwise.
 
 generate              boolean  true
                       Generate a theme from live highlights when no file

@@ -286,7 +286,9 @@ Some plugins (cyberdream) use the same `g:colors_name` for light and dark, so
 `ColorScheme` reports `cyberdream` either way. The plugin checks `&background`:
 when it's `"light"` and a `<name>-light` file exists, that's used instead
 (`light_variant_suffix`, default `-light`). Ship both `themes/cyberdream` and
-`themes/cyberdream-light` and the right one loads automatically.
+`themes/cyberdream-light` and the right one loads automatically. The suffix
+becomes part of file names and the pointer lines, so it's restricted to
+letters, digits, `.`, `_` and `-` — `setup()` errors on anything else.
 
 The pull direction understands these names too: when the theme file points at
 a `<name>-light` that isn't an installed colorscheme of its own,
