@@ -108,14 +108,18 @@ local function valid_name(name) return name:match(safe_name_pattern) ~= nil and 
 ---regular file before a byte is written — a racing link lands on either the
 ---link itself (lstat) or a foreign inode (fstat) and is refused. O_NONBLOCK
 ---keeps a planted FIFO from hanging the open; it's a no-op for regular files.
+---The open is two-step — plain first, O_CREAT|O_EXCL only on a missing path —
+---because O_CREAT alone follows a dangling link and creates its target (the
+---proof then refuses the write, but the empty file already landed); O_EXCL
+---never follows a link, failing EEXIST even on a dangling one.
 ---Returns whether the write happened — fail silently, never wrongly.
 ---@param lines string[]
 ---@param path string
 ---@return boolean
 local function write_no_symlink(lines, path)
 	local c = vim.uv.constants
-	local flags = bit.bor(c.O_WRONLY, c.O_CREAT, c.O_NONBLOCK)
-	local fd = vim.uv.fs_open(path, flags, 438) -- 0666, masked by umask like writefile
+	local fd = vim.uv.fs_open(path, bit.bor(c.O_WRONLY, c.O_NONBLOCK), 438) -- 0666, masked by umask like writefile
+	if not fd then fd = vim.uv.fs_open(path, bit.bor(c.O_WRONLY, c.O_CREAT, c.O_EXCL, c.O_NONBLOCK), 438) end
 	if not fd then return false end
 	local fst = vim.uv.fs_fstat(fd)
 	local lst = vim.uv.fs_lstat(path)

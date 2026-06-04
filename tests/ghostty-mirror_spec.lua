@@ -170,6 +170,21 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("a dangling symlink at the cache path does not create its target", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/themes"
+					vim.fn.mkdir(themes_dir, "p")
+					local victim = dir .. "/victim"
+					vim.uv.fs_symlink(victim, themes_dir .. "/mytheme")
+					local mirror = fresh_require()
+					mirror.setup({ themes_dir = themes_dir, generate = true })
+					assert.is_nil(mirror.write_generated("mytheme"))
+					assert.is_nil(vim.uv.fs_lstat(victim))
+				end)
+			end)
+		end)
+
 		it("push refuses a symlinked theme_file and skips the reload", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
