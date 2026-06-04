@@ -130,14 +130,15 @@ local function write_no_symlink(lines, path)
 	return ok
 end
 
----Read the first `count` lines of a file, tolerating it vanishing or turning
----unreadable between an fs_stat and the read (concurrent cache clear, another
----instance): an unreadable file reads as empty rather than throwing E484.
+---Read the first `count` lines of a file (all of it when count is nil),
+---tolerating it vanishing or turning unreadable between an fs_stat and the
+---read (concurrent cache clear, another instance): an unreadable file reads
+---as empty rather than throwing E484.
 ---@param path string
----@param count integer
+---@param count? integer
 ---@return string[]
 local function read_head(path, count)
-	local ok, lines = pcall(vim.fn.readfile, path, "", count)
+	local ok, lines = pcall(function() return count and vim.fn.readfile(path, "", count) or vim.fn.readfile(path) end)
 	return ok and lines or {}
 end
 
@@ -711,7 +712,7 @@ function M.push_tmux(colorscheme, opts)
 	-- sources this exact theme (force always re-sources). A cache regenerated
 	-- under an unchanged pointer still reloads — the file content changed.
 	local line = 'source-file "' .. cfg.themes_dir .. "/" .. name .. '.conf"'
-	local current = vim.fn.filereadable(cfg.theme_file) == 1 and vim.fn.readfile(cfg.theme_file)[1] or nil
+	local current = read_head(cfg.theme_file, 1)[1]
 	if (opts and opts.force) or regenerated or current ~= line then
 		if write_no_symlink({ line }, cfg.theme_file) then
 			vim.system(cfg.reload_command or { "tmux", "source-file", cfg.theme_file }, { detach = true })
@@ -753,8 +754,7 @@ end
 ---runtimepath glob), so a planted `../`-style name must die here, not execute.
 ---@return string|nil
 function M.read_current()
-	if vim.fn.filereadable(M.config.theme_file) ~= 1 then return nil end
-	for _, line in ipairs(vim.fn.readfile(M.config.theme_file)) do
+	for _, line in ipairs(read_head(M.config.theme_file)) do
 		local name = line:match("theme%s*=%s*(%S+)")
 		if name then return valid_name(name) and name or nil end
 	end

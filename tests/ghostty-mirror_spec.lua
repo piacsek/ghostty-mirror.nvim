@@ -1698,6 +1698,30 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("tolerates the pointer vanishing between existence check and read", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/themes"
+					vim.fn.mkdir(themes_dir, "p")
+					local theme_file = dir .. "/tc.conf"
+					-- Simulate the vanish race: any existence check says readable,
+					-- but the pointer is gone by the time it's read. The push must
+					-- treat it as absent and carry on, not throw E484.
+					local real_filereadable = vim.fn.filereadable
+					vim.fn.filereadable = function() return 1 end ---@diagnostic disable-line: duplicate-set-field
+					local calls, restore = stub_system()
+					local mirror = fresh_require()
+					mirror.setup({ tmux = { enabled = true, themes_dir = themes_dir, theme_file = theme_file } })
+					local ok, err = pcall(mirror.push_tmux, "mytheme")
+					vim.fn.filereadable = real_filereadable
+					restore()
+					assert.is_true(ok, tostring(err))
+					assert.equals(1, #calls)
+					assert.same({ 'source-file "' .. themes_dir .. '/mytheme.conf"' }, vim.fn.readfile(theme_file))
+				end)
+			end)
+		end)
+
 		it("honors a custom tmux reload_command", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
@@ -1971,6 +1995,22 @@ describe("ghostty-mirror", function()
 				local mirror = fresh_require()
 				mirror.setup({ theme_file = theme_file })
 				assert.equals("bar", mirror.read_current())
+			end)
+		end)
+
+		it("returns nil when the file vanishes between existence check and read", function()
+			with_tmp_dir(function(dir)
+				-- Simulate the vanish race: any existence check says readable, but
+				-- the file is gone by the time it's read. Must read as absent, not
+				-- throw E484 into pull / the FocusGained callback.
+				local real_filereadable = vim.fn.filereadable
+				vim.fn.filereadable = function() return 1 end ---@diagnostic disable-line: duplicate-set-field
+				local mirror = fresh_require()
+				mirror.setup({ theme_file = dir .. "/vanished" })
+				local ok, result = pcall(mirror.read_current)
+				vim.fn.filereadable = real_filereadable
+				assert.is_true(ok, tostring(result))
+				assert.is_nil(result)
 			end)
 		end)
 
