@@ -692,14 +692,21 @@ function M.read_current()
 end
 
 ---Apply the colorscheme stored in Ghostty's theme-current file to this Neovim
----instance. Used to pull the active theme into other nvim instances.
+---instance. Used to pull the active theme into other nvim instances. Warns
+---(rather than erroring) when the file is unreadable or names a colorscheme
+---this instance doesn't have installed.
 function M.pull()
 	local theme = M.read_current()
 	if not theme then
 		vim.notify("ghostty-mirror: could not read theme from " .. M.config.theme_file, vim.log.levels.WARN)
 		return
 	end
-	vim.cmd.colorscheme(theme)
+	if not pcall(vim.cmd.colorscheme, theme) then
+		vim.notify(
+			('ghostty-mirror: colorscheme "%s" (named in %s) is not installed'):format(theme, M.config.theme_file),
+			vim.log.levels.WARN
+		)
+	end
 end
 
 ---The colorscheme name to act on for the force commands: the last settled

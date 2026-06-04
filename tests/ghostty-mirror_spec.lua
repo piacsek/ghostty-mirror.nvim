@@ -1607,6 +1607,51 @@ describe("ghostty-mirror", function()
 	end)
 
 	describe("pull", function()
+		---Run fn with the colorscheme saved, restoring it afterwards so the
+		---highlight clobber from a real :colorscheme doesn't leak into later specs.
+		local function with_colorscheme_restored(fn)
+			local before = vim.g.colors_name
+			local ok, err = pcall(fn)
+			pcall(vim.cmd.colorscheme, before or "default")
+			if not ok then error(err) end
+		end
+
+		it("applies the colorscheme named in theme_file", function()
+			with_tmp_dir(function(dir)
+				with_colorscheme_restored(function()
+					vim.fn.writefile({ "theme = elflord" }, dir .. "/theme-current")
+					local _, restore = stub_system()
+					local mirror = fresh_require()
+					mirror.setup({
+						themes_dir = dir,
+						theme_file = dir .. "/theme-current",
+						generate = false,
+						debounce_ms = 0,
+					})
+					mirror.pull()
+					restore()
+					assert.equals("elflord", vim.g.colors_name)
+				end)
+			end)
+		end)
+
+		it("warns and keeps the current colorscheme when the named scheme is not installed", function()
+			with_tmp_dir(function(dir)
+				local before = vim.g.colors_name
+				vim.fn.writefile({ "theme = ghostty-mirror-nope-xyzzy" }, dir .. "/theme-current")
+				local notices, restore = stub_notify()
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/theme-current", generate = false })
+				local ok = pcall(mirror.pull)
+				restore()
+				assert.is_true(ok)
+				assert.equals(before, vim.g.colors_name)
+				assert.equals(1, #notices)
+				assert.equals(vim.log.levels.WARN, notices[1].level)
+				assert.is_truthy(notices[1].msg:find("ghostty-mirror-nope-xyzzy", 1, true))
+			end)
+		end)
+
 		it("warns and keeps the current colorscheme when theme_file is unreadable", function()
 			with_tmp_dir(function(dir)
 				local before = vim.g.colors_name
