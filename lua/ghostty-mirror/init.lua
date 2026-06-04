@@ -680,13 +680,16 @@ function M.clear_cache()
 	return cleared
 end
 
----Read the theme name currently set in Ghostty's theme-current file.
+---Read the theme name currently set in Ghostty's theme-current file. Returns
+---only names that pass valid_name: theme_file is writable by any process, and
+---callers feed the name to :colorscheme (which resolves it against the
+---runtimepath glob), so a planted `../`-style name must die here, not execute.
 ---@return string|nil
 function M.read_current()
 	if vim.fn.filereadable(M.config.theme_file) ~= 1 then return nil end
 	for _, line in ipairs(vim.fn.readfile(M.config.theme_file)) do
 		local name = line:match("theme%s*=%s*(%S+)")
-		if name then return name end
+		if name then return valid_name(name) and name or nil end
 	end
 	return nil
 end
