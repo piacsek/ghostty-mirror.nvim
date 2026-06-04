@@ -2062,6 +2062,25 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("flags unwritable themes_dir and theme_file as errors", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir .. "/missing/parent/themes",
+					theme_file = dir .. "/missing/parent/theme-current",
+					reload_command = { "echo" },
+				})
+				local d = fresh_health().diagnostics()
+				local function status_of(needle)
+					for _, e in ipairs(d) do
+						if e.msg:find(needle, 1, true) then return e.status end
+					end
+				end
+				assert.equals("error", status_of("themes_dir not writable"))
+				assert.equals("error", status_of("theme_file not writable"))
+			end)
+		end)
+
 		it("flags an unresolvable reload command as an error", function()
 			with_tmp_dir(function(dir)
 				local mirror = fresh_require()
@@ -2521,6 +2540,13 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("accepts a double-quoted include value", function()
+			with_tmp_dir(function(dir)
+				local h = with_health(dir, { 'config-file = "' .. dir .. '/theme-current"' })
+				assert.equals("ok", include_entry(h).status)
+			end)
+		end)
+
 		it("warns with the exact line to add when the config lacks the include", function()
 			with_tmp_dir(function(dir)
 				local h = with_health(dir, { "font-family = monospace" })
@@ -2543,6 +2569,20 @@ describe("ghostty-mirror", function()
 			with_tmp_dir(function(dir)
 				local h = with_health(dir, { "# config-file = ?" .. dir .. "/theme-current" })
 				assert.equals("warn", include_entry(h).status)
+			end)
+		end)
+
+		it("finds the include in a later candidate config when the first lacks it", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/theme-current", reload_command = { "echo" } })
+				vim.fn.writefile({ "font-family = monospace" }, dir .. "/config-a")
+				vim.fn.writefile({ "config-file = ?" .. dir .. "/theme-current" }, dir .. "/config-b")
+				local h = fresh_health()
+				h.ghostty_config_paths = function() return { dir .. "/config-a", dir .. "/config-b" } end
+				local e = include_entry(h)
+				assert.equals("ok", e.status)
+				assert.is_truthy(e.msg:find(dir .. "/config-b", 1, true))
 			end)
 		end)
 	end)
@@ -2674,6 +2714,20 @@ describe("ghostty-mirror", function()
 				local found = false
 				for _, e in ipairs(h.diagnostics()) do
 					if e.status == "ok" and e.msg:find("Ghostty", 1, true) then found = true end
+				end
+				assert.is_true(found)
+			end)
+		end)
+
+		it("reports info, not a warning, when the check itself is unavailable", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/tc", reload_command = { "echo" } })
+				local h = fresh_health()
+				h.ghostty_running = function() return nil end
+				local found = false
+				for _, e in ipairs(h.diagnostics()) do
+					if e.status == "info" and e.msg:find("could not check", 1, true) then found = true end
 				end
 				assert.is_true(found)
 			end)
