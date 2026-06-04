@@ -30,3 +30,7 @@ vim.cmd("runtime plugin/plenary.vim")
 local sandbox = vim.fn.tempname() .. "-home"
 vim.fn.mkdir(sandbox, "p")
 vim.env.HOME = sandbox
+-- health.lua prefers $XDG_CONFIG_HOME over ~/.config, so sandbox it too:
+-- without this, a health spec that forgets to stub ghostty_config_paths
+-- would read the developer's real Ghostty config.
+vim.env.XDG_CONFIG_HOME = sandbox .. "/.config"
