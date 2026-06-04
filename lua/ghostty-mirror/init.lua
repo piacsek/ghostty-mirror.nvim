@@ -703,6 +703,26 @@ function M.read_current()
 	return nil
 end
 
+---Apply a theme name read from theme_file as a colorscheme. A generated light
+---variant carries light_variant_suffix without being a colorscheme of its own
+---(push writes "scintilla-sapphire-light" for scintilla-sapphire under a light
+---background), so when the name doesn't load as-is, retry the base scheme
+---under &background = "light" — set before the load so the scheme adapts as
+---it applies. The full name is tried first: some variants (cyberdream-light)
+---are real colorschemes.
+---@param theme string
+---@return boolean # whether a colorscheme was applied
+local function apply_pulled(theme)
+	if pcall(vim.cmd.colorscheme, theme) then return true end
+	local suffix = M.config.light_variant_suffix
+	if not (suffix and suffix ~= "" and #theme > #suffix and theme:sub(-#suffix) == suffix) then return false end
+	local prev = vim.o.background
+	vim.o.background = "light"
+	if pcall(vim.cmd.colorscheme, theme:sub(1, -#suffix - 1)) then return true end
+	vim.o.background = prev
+	return false
+end
+
 ---Apply the colorscheme stored in Ghostty's theme-current file to this Neovim
 ---instance. Used to pull the active theme into other nvim instances. Warns
 ---(rather than erroring) when the file is unreadable or names a colorscheme
@@ -713,7 +733,7 @@ function M.pull()
 		vim.notify("ghostty-mirror: could not read theme from " .. M.config.theme_file, vim.log.levels.WARN)
 		return
 	end
-	if not pcall(vim.cmd.colorscheme, theme) then
+	if not apply_pulled(theme) then
 		vim.notify(
 			('ghostty-mirror: colorscheme "%s" (named in %s) is not installed'):format(theme, M.config.theme_file),
 			vim.log.levels.WARN

@@ -283,6 +283,11 @@ when it's `"light"` and a `<name>-light` file exists, that's used instead
 (`light_variant_suffix`, default `-light`). Ship both `themes/cyberdream` and
 `themes/cyberdream-light` and the right one loads automatically.
 
+The pull direction understands these names too: when the theme file points at
+a `<name>-light` that isn't an installed colorscheme of its own,
+`:ThemeFromGhostty` (and the focus/startup syncs) applies the base scheme with
+`&background` set to `"light"` first, so the variant reproduces.
+
 ## Troubleshooting
 
 Run `:checkhealth ghostty-mirror` first — it flags the common environmental

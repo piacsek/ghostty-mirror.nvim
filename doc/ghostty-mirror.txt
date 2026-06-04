@@ -35,7 +35,10 @@ Setup is automatic with defaults; call |ghostty-mirror.setup()| to override.
                                                               *:ThemeFromGhostty*
 :ThemeFromGhostty   Apply the colorscheme named in Ghostty's theme file to this
                     Neovim instance. Run it in other nvim windows to re-sync
-                    them without restarting.
+                    them without restarting. A generated light-variant name
+                    (`<name>` + `light_variant_suffix`) that isn't a
+                    colorscheme of its own applies as the base scheme under
+                    'background' "light".
 
                                                                 *:ThemeToGhostty*
 :ThemeToGhostty     Force-regenerate the current colorscheme's Ghostty theme

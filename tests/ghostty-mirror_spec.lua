@@ -1723,6 +1723,46 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("falls back to the base scheme under a light background for a generated light-variant name", function()
+			with_tmp_dir(function(dir)
+				with_colorscheme_restored(function()
+					local bg = vim.o.background
+					vim.fn.writefile({ "theme = default-light" }, dir .. "/theme-current")
+					local _, restore = stub_system()
+					local mirror = fresh_require()
+					mirror.setup({
+						themes_dir = dir,
+						theme_file = dir .. "/theme-current",
+						generate = false,
+						debounce_ms = 0,
+					})
+					mirror.pull()
+					restore()
+					local got, got_bg = vim.g.colors_name, vim.o.background
+					vim.o.background = bg
+					assert.equals("default", got)
+					assert.equals("light", got_bg)
+				end)
+			end)
+		end)
+
+		it("warns and restores the background when neither the variant nor its base is installed", function()
+			with_tmp_dir(function(dir)
+				local before, bg = vim.g.colors_name, vim.o.background
+				vim.fn.writefile({ "theme = ghostty-mirror-nope-light" }, dir .. "/theme-current")
+				local notices, restore = stub_notify()
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/theme-current", generate = false })
+				mirror.pull()
+				restore()
+				assert.equals(before, vim.g.colors_name)
+				assert.equals(bg, vim.o.background)
+				assert.equals(1, #notices)
+				assert.equals(vim.log.levels.WARN, notices[1].level)
+				assert.is_truthy(notices[1].msg:find("ghostty-mirror-nope-light", 1, true))
+			end)
+		end)
+
 		it("warns and keeps the current colorscheme when the named scheme is not installed", function()
 			with_tmp_dir(function(dir)
 				local before = vim.g.colors_name
