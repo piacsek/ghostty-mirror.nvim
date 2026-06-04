@@ -54,8 +54,10 @@ Setup is automatic with defaults; call |ghostty-mirror.setup()| to override.
 
                                                               *:ThemeCacheClear*
 :ThemeCacheClear    Delete every generated theme file (recognized by their
-                    header); hand-made files are left untouched. The next
-                    `:colorscheme` regenerates fresh.
+                    header line); hand-made files are left untouched. The next
+                    `:colorscheme` regenerates fresh. An edited cache keeping
+                    the header still counts as generated — delete the header
+                    line to claim a file as hand-made.
 
 ==============================================================================
 3. CONFIGURATION                                 *ghostty-mirror-configuration*
