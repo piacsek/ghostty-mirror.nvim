@@ -89,3 +89,13 @@ Ghostty config that never reads `theme_file` because the `config-file`
 include line is absent. The check scans the XDG and macOS config locations,
 understands the optional-`?` prefix, quoted values, `~`, and
 config-dir-relative paths, and warns with the exact line to add.
+
+## 0.6.0 — Granular tmux overrides (planned)
+
+Detach the tmux colors that are currently welded to the single `accent`
+input, starting with `copy_mode`: today `mode-style` (the copy-mode mouse
+selection) follows the accent, so "magenta selections, blue everything else"
+isn't expressible. A `copy_mode` override param sets it directly, with the
+selection text contrast-picked and everything else (pill, active border,
+status-right, clock) staying on `accent`. Unset keeps today's output
+byte-identical. Further params may follow the same pattern as needs surface.
