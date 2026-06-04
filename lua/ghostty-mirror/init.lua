@@ -108,11 +108,22 @@ local function write_no_symlink(lines, path)
 	return true
 end
 
+---Read the first `count` lines of a file, tolerating it vanishing or turning
+---unreadable between an fs_stat and the read (concurrent cache clear, another
+---instance): an unreadable file reads as empty rather than throwing E484.
+---@param path string
+---@param count integer
+---@return string[]
+local function read_head(path, count)
+	local ok, lines = pcall(vim.fn.readfile, path, "", count)
+	return ok and lines or {}
+end
+
 ---Whether a theme file is plugin-generated (its first line is the marker).
 ---@param path string
 ---@return boolean
 local function is_generated(path)
-	local first = vim.fn.readfile(path, "", 1)[1]
+	local first = read_head(path, 1)[1]
 	return first ~= nil and vim.startswith(first, generated_marker)
 end
 
@@ -540,7 +551,7 @@ end
 ---@return boolean
 local function cache_current(path, expected_stamp)
 	if not is_generated(path) then return true end
-	local second = vim.fn.readfile(path, "", 2)[2]
+	local second = read_head(path, 2)[2]
 	local stamp = second ~= nil and vim.startswith(second, "# overrides:") and second or nil
 	return stamp == expected_stamp
 end
