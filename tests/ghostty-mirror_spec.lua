@@ -217,6 +217,35 @@ describe("ghostty-mirror", function()
 				assert.is_nil(mirror.resolve_tmux(""))
 			end)
 		end)
+
+		it("write_generated and write_tmux_generated refuse a path-traversal name themselves", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/themes"
+					vim.fn.mkdir(themes_dir, "p")
+					local mirror = fresh_require()
+					mirror.setup({
+						themes_dir = themes_dir,
+						tmux = { enabled = true, themes_dir = themes_dir },
+					})
+					assert.is_nil(mirror.write_generated("../escape"))
+					assert.is_nil(mirror.write_tmux_generated("../escape"))
+					assert.equals(0, vim.fn.filereadable(dir .. "/escape"))
+					assert.equals(0, vim.fn.filereadable(dir .. "/escape.conf"))
+				end)
+			end)
+		end)
+
+		it("resolve and resolve_tmux refuse the bare dot names", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, tmux = { enabled = true, themes_dir = dir } })
+				assert.is_nil(mirror.resolve("."))
+				assert.is_nil(mirror.resolve(".."))
+				assert.is_nil(mirror.resolve_tmux("."))
+				assert.is_nil(mirror.resolve_tmux(".."))
+			end)
+		end)
 	end)
 
 	describe("push", function()
