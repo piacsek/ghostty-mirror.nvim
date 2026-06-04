@@ -91,7 +91,7 @@ How the user likes work to flow — follow it unless told otherwise:
 
 1. **Plan as a concrete task list.** Break the request into small, ordered tasks, each independently testable and committable. Work them top to bottom.
 2. **Drive each task with the `/tdd` skill.** Failing spec first, make it pass, refactor — small increments. Behavior changes start from a test, never from the implementation. Where the skill says the *user* commits checkpoints, this repo overrides it: the agent commits and pushes per task (see below), no need to ask.
-3. **One commit per task.** A task is done when its specs are green (`make test`) and `make lint` is clean. Then, per task:
+3. **One commit per task.** A task is done when its specs are green (`make test`), `make lint` is clean, and the docs are consistent — anything the task touched that's user-visible reads the same in `README.md` and `doc/ghostty-mirror.txt`, including examples (a wiring example that omits a step its own prose prescribes is drift too). Then, per task:
    - commit with a clear message and **push straight to `main`** — no feature branch or PR (standing preference);
    - update the locally-installed copy so it's testable in the user's running Neovim — installed via `vim.pack` at `~/.local/share/nvim/site/pack/core/opt/ghostty-mirror.nvim`, so `git -C <that path> pull --ff-only origin main`. The user then restarts Neovim (or re-`require`s the module) to load it.
 4. **Never cut a release on your own.** Tags / version bumps happen **only when explicitly asked**.
