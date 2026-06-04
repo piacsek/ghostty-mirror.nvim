@@ -2149,11 +2149,13 @@ describe("ghostty-mirror", function()
 			assert.equals(false, mirror.config.light_variant_suffix)
 		end)
 
-		it("rejects tmux paths carrying quotes or newlines, naming the field", function()
+		it("rejects tmux paths carrying quotes, backslashes or newlines, naming the field", function()
 			-- tmux.themes_dir is interpolated into the quoted `source-file "..."`
-			-- line in a file tmux executes; a quote or newline escapes the quoting.
+			-- line in a file tmux executes; a quote or newline escapes the quoting,
+			-- and tmux interprets backslash escapes inside the double quotes, so a
+			-- backslash silently mangles the path.
 			for _, field in ipairs({ "themes_dir", "theme_file" }) do
-				for _, bad in ipairs({ '/tmp/x"y', "/tmp/x\ny" }) do
+				for _, bad in ipairs({ '/tmp/x"y', "/tmp/x\ny", "/tmp/x\\y" }) do
 					local mirror = fresh_require()
 					local ok, err = pcall(mirror.setup, { tmux = { [field] = bad } })
 					assert.is_false(ok, ("tmux.%s %q was accepted"):format(field, bad))
