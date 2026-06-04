@@ -2502,6 +2502,104 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("health: tmux", function()
+		local function fresh_health()
+			package.loaded["ghostty-mirror.health"] = nil
+			return require("ghostty-mirror.health")
+		end
+
+		---The first diagnostic whose message contains `needle`.
+		local function entry(h, needle)
+			for _, e in ipairs(h.diagnostics()) do
+				if e.msg:find(needle, 1, true) then return e end
+			end
+		end
+
+		it("reports ok for writable tmux paths when mirroring is enabled", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir,
+					theme_file = dir .. "/tc",
+					reload_command = { "echo" },
+					tmux = { enabled = true, themes_dir = dir .. "/tmux-themes", theme_file = dir .. "/tmux.conf" },
+				})
+				local h = fresh_health()
+				assert.equals("ok", entry(h, "tmux themes_dir writable").status)
+				assert.equals("ok", entry(h, "tmux theme_file writable").status)
+			end)
+		end)
+
+		it("flags unwritable tmux paths as errors", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir,
+					theme_file = dir .. "/tc",
+					reload_command = { "echo" },
+					tmux = {
+						enabled = true,
+						themes_dir = dir .. "/missing/parent/themes",
+						theme_file = dir .. "/missing/parent/tmux.conf",
+					},
+				})
+				local h = fresh_health()
+				assert.equals("error", entry(h, "tmux themes_dir not writable").status)
+				assert.equals("error", entry(h, "tmux theme_file not writable").status)
+			end)
+		end)
+
+		---Run fn with $PATH pinned, so the executable() checks don't depend on
+		---whether the machine running the suite actually has tmux installed.
+		local function with_path(path, fn)
+			local saved = vim.env.PATH
+			vim.env.PATH = path
+			local ok, err = pcall(fn)
+			vim.env.PATH = saved
+			if not ok then error(err) end
+		end
+
+		it("reports ok when tmux is on PATH", function()
+			with_tmp_dir(function(dir)
+				local bin = dir .. "/bin"
+				vim.fn.mkdir(bin, "p")
+				vim.fn.writefile({ "#!/bin/sh" }, bin .. "/tmux")
+				vim.fn.setfperm(bin .. "/tmux", "rwxr-xr-x")
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir,
+					theme_file = dir .. "/tc",
+					tmux = { enabled = true, themes_dir = dir, theme_file = dir .. "/tmux.conf" },
+				})
+				local h = fresh_health()
+				with_path(bin, function() assert.equals("ok", entry(h, "tmux found on PATH").status) end)
+			end)
+		end)
+
+		it("warns when tmux mirroring is enabled but tmux is not on PATH", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir,
+					theme_file = dir .. "/tc",
+					tmux = { enabled = true, themes_dir = dir, theme_file = dir .. "/tmux.conf" },
+				})
+				local h = fresh_health()
+				with_path(dir, function() assert.equals("warn", entry(h, "tmux is not on PATH").status) end)
+			end)
+		end)
+
+		it("reports an info line when tmux mirroring is disabled", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, theme_file = dir .. "/tc", reload_command = { "echo" } })
+				local h = fresh_health()
+				assert.equals("info", entry(h, "tmux mirroring disabled").status)
+				assert.is_nil(entry(h, "tmux themes_dir"))
+			end)
+		end)
+	end)
+
 	describe("health: ghostty process", function()
 		local function fresh_health()
 			package.loaded["ghostty-mirror.health"] = nil
