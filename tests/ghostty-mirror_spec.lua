@@ -192,6 +192,15 @@ describe("ghostty-mirror", function()
 				end)
 			end)
 		end)
+
+		it("resolve and resolve_tmux refuse an empty name", function()
+			with_tmp_dir(function(dir)
+				local mirror = fresh_require()
+				mirror.setup({ themes_dir = dir, tmux = { enabled = true, themes_dir = dir } })
+				assert.is_nil(mirror.resolve(""))
+				assert.is_nil(mirror.resolve_tmux(""))
+			end)
+		end)
 	end)
 
 	describe("push", function()
@@ -2507,6 +2516,28 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("keeps the current colorscheme when theme_file names an uninstalled scheme", function()
+			with_tmp_dir(function(dir)
+				vim.cmd.colorscheme("default")
+				vim.fn.writefile({ "theme = ghostty-mirror-nope-xyzzy" }, dir .. "/tc")
+				local _, restore_system = stub_system()
+				local _, restore_notify = stub_notify()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir .. "/themes",
+					theme_file = dir .. "/tc",
+					reload_command = { "echo" },
+					generate = false,
+					debounce_ms = 0,
+					sync_on_startup = true,
+				})
+				vim.api.nvim_exec_autocmds("VimEnter", {})
+				restore_system()
+				restore_notify()
+				assert.equals("default", vim.g.colors_name)
+			end)
+		end)
+
 		it("does not apply any theme on setup by default", function()
 			with_tmp_dir(function(dir)
 				vim.cmd.colorscheme("default")
@@ -2567,6 +2598,26 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("keeps the current colorscheme when theme_file names an uninstalled scheme", function()
+			with_tmp_dir(function(dir)
+				local _, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir .. "/themes",
+					theme_file = dir .. "/tc",
+					reload_command = { "echo" },
+					generate = false,
+					debounce_ms = 0,
+					sync_on_focus = true,
+				})
+				vim.cmd.colorscheme("default")
+				vim.fn.writefile({ "theme = ghostty-mirror-nope-xyzzy" }, dir .. "/tc")
+				vim.api.nvim_exec_autocmds("FocusGained", {})
+				restore()
+				assert.equals("default", vim.g.colors_name)
+			end)
+		end)
+
 		it("does nothing on FocusGained by default", function()
 			with_tmp_dir(function(dir)
 				local _, restore = stub_system()
@@ -2584,6 +2635,28 @@ describe("ghostty-mirror", function()
 				restore()
 				assert.equals("default", vim.g.colors_name)
 			end)
+		end)
+	end)
+
+	describe("plugin auto-setup", function()
+		it("sources setup once, guarded by g:loaded_ghostty_mirror", function()
+			local plugin_file = vim.fn.fnamemodify(
+				vim.api.nvim_get_runtime_file("lua/ghostty-mirror/init.lua", false)[1],
+				":h:h:h"
+			) .. "/plugin/ghostty-mirror.lua"
+			local saved = vim.g.loaded_ghostty_mirror
+			local mirror = fresh_require()
+			local original = mirror.setup
+			local count = 0
+			mirror.setup = function() count = count + 1 end ---@diagnostic disable-line: duplicate-set-field
+			vim.g.loaded_ghostty_mirror = nil
+			vim.cmd.source(plugin_file)
+			assert.equals(1, count)
+			assert.is_true(vim.g.loaded_ghostty_mirror)
+			vim.cmd.source(plugin_file)
+			assert.equals(1, count)
+			mirror.setup = original
+			vim.g.loaded_ghostty_mirror = saved
 		end)
 	end)
 
