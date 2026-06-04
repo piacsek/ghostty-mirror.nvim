@@ -150,6 +150,11 @@ To hand-author a theme instead of generating one, drop a
 set-window-option -g window-status-format " #W "
 set-window-option -g window-status-current-format " #W "
 
+# Re-apply the last mirrored theme on server start (the plugin only sources
+# it into a running server).
+if-shell "test -f ~/.config/tmux/theme-current.conf" \
+  "source-file ~/.config/tmux/theme-current.conf"
+
 # Forward focus events so sync_on_focus fires when you switch panes.
 set-option -g focus-events on
 ```

@@ -133,7 +133,16 @@ tmux                  table    { enabled = false, ... }
                       Opt-in tmux statusline mirroring. Fields: enabled,
                       themes_dir, theme_file, generate, reload_command,
                       bar_blend, accent_hl, divider_hl, overrides. See the
-                      README.
+                      README. Two considerations for your tmux.conf: keep
+                      window-status-format / window-status-current-format
+                      layout-only (an inline #[bg=…] overrides the generated
+                      *-style options), and source theme_file once at startup,
+                      after your own theme block, so the theme survives a tmux
+                      server restart (the plugin only sources it into a
+                      running server): >
+                          if-shell "test -f ~/.config/tmux/theme-current.conf" \
+                            "source-file ~/.config/tmux/theme-current.conf"
+<
 
 tmux.overrides        table    {}               *ghostty-mirror-tmux-overrides*
                       Per-theme tweaks merged into tmux theme generation.
