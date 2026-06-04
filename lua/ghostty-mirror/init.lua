@@ -176,10 +176,13 @@ local function is_generated(path)
 end
 
 ---Convert a 24-bit color integer (as returned by nvim_get_hl) to "#rrggbb".
+---Out-of-range values (a plugin handing nvim_set_hl a number wider than 24
+---bits) yield nil rather than a >6-digit directive tmux/Ghostty can't parse —
+---fail silently, never wrongly.
 ---@param n integer|nil
 ---@return string|nil
 local function hex(n)
-	if type(n) ~= "number" then return nil end
+	if type(n) ~= "number" or n < 0 or n > 0xffffff then return nil end
 	return string.format("#%06x", n)
 end
 
