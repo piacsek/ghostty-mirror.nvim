@@ -189,6 +189,31 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("refuses a symlink swapped in after any pre-write check (TOCTOU)", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/themes"
+					vim.fn.mkdir(themes_dir, "p")
+					local victim = dir .. "/victim"
+					vim.fn.writefile({ "precious" }, victim)
+					vim.uv.fs_symlink(victim, themes_dir .. "/mytheme")
+					-- Simulate the racer winning: every path-based lstat is fooled
+					-- into seeing a plain regular file, yet the link is in place when
+					-- the write happens. Only refusing at the fd level (the opened
+					-- inode is not the path's) protects the victim here.
+					local real_lstat = vim.uv.fs_lstat
+					vim.uv.fs_lstat = function() return { type = "file", ino = 0, dev = 0 } end ---@diagnostic disable-line: duplicate-set-field
+					local mirror = fresh_require()
+					mirror.setup({ themes_dir = themes_dir, generate = true })
+					local ok, result = pcall(mirror.write_generated, "mytheme")
+					vim.uv.fs_lstat = real_lstat
+					assert.is_true(ok, tostring(result))
+					assert.is_nil(result)
+					assert.same({ "precious" }, vim.fn.readfile(victim))
+				end)
+			end)
+		end)
+
 		it("push_tmux refuses a symlinked tmux theme_file and skips the reload", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
