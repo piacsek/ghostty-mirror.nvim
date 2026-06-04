@@ -285,6 +285,16 @@ local function target_name(colorscheme)
 	return colorscheme
 end
 
+---target_name's inverse: the base scheme name when `name` carries
+---light_variant_suffix (and isn't just the bare suffix), nil otherwise.
+---@param name string
+---@return string|nil
+local function light_base(name)
+	local suffix = M.config.light_variant_suffix
+	if not (suffix and suffix ~= "" and #name > #suffix and name:sub(-#suffix) == suffix) then return nil end
+	return name:sub(1, -#suffix - 1)
+end
+
 ---The normalized per-theme Ghostty overrides that actually take effect for a
 ---resolved theme name; invalid values are absent so generation falls back.
 ---@param name GhosttyMirrorThemeName
@@ -714,11 +724,11 @@ end
 ---@return boolean # whether a colorscheme was applied
 local function apply_pulled(theme)
 	if pcall(vim.cmd.colorscheme, theme) then return true end
-	local suffix = M.config.light_variant_suffix
-	if not (suffix and suffix ~= "" and #theme > #suffix and theme:sub(-#suffix) == suffix) then return false end
+	local base = light_base(theme)
+	if not base then return false end
 	local prev = vim.o.background
 	vim.o.background = "light"
-	if pcall(vim.cmd.colorscheme, theme:sub(1, -#suffix - 1)) then return true end
+	if pcall(vim.cmd.colorscheme, base) then return true end
 	vim.o.background = prev
 	return false
 end
@@ -822,10 +832,9 @@ local function validate_overrides(overrides, params, side)
 	for _, scheme in ipairs(vim.fn.getcompletion("", "color")) do
 		known[scheme] = true
 	end
-	local suffix = M.config.light_variant_suffix
 	for name, entry in pairs(overrides) do
-		local base = suffix and suffix ~= "" and name:sub(-#suffix) == suffix and name:sub(1, -#suffix - 1)
-		if not (known[name] or known[base]) then
+		local base = light_base(name)
+		if not (known[name] or (base and known[base])) then
 			warn('%soverride for "%s" matches no installed colorscheme', side, name)
 		end
 		for param, value in pairs(entry) do
@@ -982,16 +991,17 @@ function M.setup(opts)
 	if M.config.sync_on_focus then
 		-- Re-sync to whichever instance last wrote the theme when this window
 		-- regains focus. Only re-apply when it actually differs from what we
-		-- loaded, so a focus in an already-synced window is a no-op.
-		-- nested for the same reason as the startup sync: the applied colorscheme
-		-- must re-fire ColorScheme so the mirror chain (push, stamp check,
-		-- last_scheme) runs for the synced scheme too.
+		-- loaded — compared via target_name, since a light-variant pointer never
+		-- equals the bare scheme name current_scheme reports and would otherwise
+		-- re-apply on every focus. nested for the same reason as the startup
+		-- sync: the applied colorscheme must re-fire ColorScheme so the mirror
+		-- chain (push, stamp check, last_scheme) runs for the synced scheme too.
 		vim.api.nvim_create_autocmd("FocusGained", {
 			group = group,
 			nested = true,
 			callback = function()
 				local theme = M.read_current()
-				if theme and theme ~= M.current_scheme() then pcall(vim.cmd.colorscheme, theme) end
+				if theme and theme ~= target_name(M.current_scheme()) then apply_pulled(theme) end
 			end,
 		})
 	end

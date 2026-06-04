@@ -2714,6 +2714,60 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("applies a generated light-variant name via its base scheme on FocusGained", function()
+			with_tmp_dir(function(dir)
+				local bg = vim.o.background
+				local _, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir .. "/themes",
+					theme_file = dir .. "/tc",
+					reload_command = { "echo" },
+					generate = false,
+					debounce_ms = 0,
+					sync_on_focus = true,
+				})
+				vim.o.background = "dark"
+				vim.cmd.colorscheme("default")
+				vim.fn.writefile({ "theme = default-light" }, dir .. "/tc")
+				vim.api.nvim_exec_autocmds("FocusGained", {})
+				restore()
+				local got, got_bg = vim.g.colors_name, vim.o.background
+				vim.o.background = bg
+				assert.equals("default", got)
+				assert.equals("light", got_bg)
+			end)
+		end)
+
+		it("does not re-apply on a later focus once synced to a light variant", function()
+			with_tmp_dir(function(dir)
+				local bg = vim.o.background
+				local _, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir .. "/themes",
+					theme_file = dir .. "/tc",
+					reload_command = { "echo" },
+					generate = false,
+					debounce_ms = 0,
+					sync_on_focus = true,
+				})
+				vim.o.background = "dark"
+				vim.cmd.colorscheme("default")
+				vim.fn.writefile({ "theme = default-light" }, dir .. "/tc")
+				vim.api.nvim_exec_autocmds("FocusGained", {})
+				local reapplied = 0
+				local au = vim.api.nvim_create_autocmd("ColorScheme", {
+					callback = function() reapplied = reapplied + 1 end,
+				})
+				vim.api.nvim_exec_autocmds("FocusGained", {})
+				vim.api.nvim_del_autocmd(au)
+				restore()
+				vim.o.background = bg
+				assert.equals(0, reapplied)
+			end)
+		end)
+
 		it("keeps the current colorscheme when theme_file names an uninstalled scheme", function()
 			with_tmp_dir(function(dir)
 				local _, restore = stub_system()
