@@ -278,7 +278,10 @@ picker's live preview pushes once the selection settles, not per previewed
 scheme. `:ThemeToGhostty` / `:ThemeToTmux` act immediately.
 
 The plugin owns *only* the include file and the themes it generates — never your
-main Ghostty config or hand-made theme files.
+main Ghostty config or hand-made theme files. It also refuses to write through
+a symlink at any of its destinations (the include files and theme cache paths),
+so keep those as regular files — a symlinked parent directory (a dotfiles-style
+`~/.config/ghostty` link) is fine.
 
 ### Light/dark variants
 

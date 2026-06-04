@@ -21,7 +21,10 @@ A theme is resolved by precedence: a hand-made or cached file at
 `themes_dir/<name>` wins (honoring the light variant when 'background' is
 "light"); otherwise one is generated from live highlights and cached. The
 plugin owns only the include file and the themes it generates — never your
-main Ghostty config or hand-made theme files.
+main Ghostty config or hand-made theme files. It also refuses to write
+through a symlink at any of its destinations (the include files and theme
+cache paths), so keep those as regular files — a symlinked parent directory
+is fine.
 
 Requires Neovim 0.10+.
 
