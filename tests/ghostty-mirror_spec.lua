@@ -329,6 +329,19 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("falls back to Cursor.fg for cursor-color when Cursor has no bg, still omitting cursor-text", function()
+			with_palette(function()
+				vim.api.nvim_set_hl(0, "Cursor", { fg = 0xf5e0dc })
+				local mirror = fresh_require()
+				mirror.setup({ generate = true })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("cursor%-color = #f5e0dc"))
+				-- fg-only means cursor-color above *is* the fg; emitting it again as
+				-- the glyph color would render an invisible block cursor.
+				assert.is_nil(joined:find("cursor%-text"))
+			end)
+		end)
+
 		it("omits the palette but still emits colors when the palette is incomplete", function()
 			with_palette(function()
 				vim.g.terminal_color_7 = nil
