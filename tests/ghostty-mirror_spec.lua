@@ -354,6 +354,47 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("push_tmux refuses a tmux.themes_dir mutated to unsafe values after setup", function()
+			-- setup() validates tmux.themes_dir, but M.config is plain data any
+			-- code can mutate afterwards; the dir lands inside the quoted
+			-- source-file line tmux executes, so the sink must re-refuse it.
+			with_palette(function()
+				for _, bad in ipairs({ '"', "\\", "\n" }) do
+					with_tmp_dir(function(dir)
+						local t = dir .. "/t"
+						vim.fn.mkdir(t, "p")
+						local calls, restore = stub_system()
+						local mirror = fresh_require()
+						mirror.setup({ tmux = { enabled = true, themes_dir = t, theme_file = dir .. "/tc.conf" } })
+						mirror.config.tmux.themes_dir = t .. bad .. "x"
+						mirror.push_tmux("mytheme", { force = true })
+						restore()
+						assert.equals(0, vim.fn.filereadable(dir .. "/tc.conf"), ("pointer written for %q"):format(bad))
+						assert.equals(0, #calls, ("reload fired for %q"):format(bad))
+					end)
+				end
+			end)
+		end)
+
+		it("a light_variant_suffix mutated to an unsafe value after setup is ignored at use", function()
+			-- setup() errors on an unsafe suffix, but M.config is plain data any
+			-- code can mutate afterwards; the suffix extends already-validated
+			-- names into the same paths and pointer lines, so at use an unsafe
+			-- value must read as disabled rather than ride a validated name out.
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local mirror = fresh_require()
+					mirror.setup({ themes_dir = dir })
+					mirror.config.light_variant_suffix = '"\n-evil'
+					vim.o.background = "light"
+					local name = mirror.resolve("mytheme")
+					vim.o.background = "dark"
+					assert.equals("mytheme", name)
+					assert.equals(1, vim.fn.filereadable(dir .. "/mytheme"))
+				end)
+			end)
+		end)
+
 		it("resolve and resolve_tmux refuse the bare dot names", function()
 			with_tmp_dir(function(dir)
 				local mirror = fresh_require()
