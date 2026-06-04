@@ -12,6 +12,16 @@ selection text contrast-picked and everything else (pill, active border,
 status-right, clock) staying on `accent`. Unset keeps today's output
 byte-identical. Further params may follow the same pattern as needs surface.
 
+## 0.5.2 — Pull resilience + coverage backfill
+
+`:ThemeFromGhostty` now warns (naming the scheme and `theme_file`) instead
+of throwing a raw E185 when the pointer names a colorscheme this instance
+doesn't have installed — matching the existing unreadable-file warning and
+the pcall'd sync paths. The rest is the test-coverage backfill from the
+audit in issue #7: tmux health diagnostics, health edge branches, generate's
+cursor fg-only fallback, debounce and manage_background under tmux, and the
+plugin auto-setup guard (158 to 177 specs).
+
 ## 0.5.1 — Health: include wiring
 
 `:checkhealth ghostty-mirror` now detects the most common setup miss: a
