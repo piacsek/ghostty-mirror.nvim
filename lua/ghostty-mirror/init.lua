@@ -139,16 +139,32 @@ local function write_no_symlink(lines, path)
 	return ok
 end
 
----Read the first `count` lines of a file (all of it when count is nil),
+-- Byte ceiling on any plugin read. The files read are pointer files and theme
+-- headers (a few hundred bytes), so anything past this is not ours to parse —
+-- it also bounds what a planted file can make the plugin pull into memory.
+local read_cap = 16384
+
+---Read the first `count` lines of a file (the capped head when count is nil),
 ---tolerating it vanishing or turning unreadable between an fs_stat and the
 ---read (concurrent cache clear, another instance): an unreadable file reads
----as empty rather than throwing E484.
+---as empty rather than throwing. Reads are guarded like writes are: the paths
+---are writable by any process, so O_NONBLOCK keeps a planted FIFO from
+---hanging the open, the fstat type check refuses special files (a /dev/zero
+---link reads unboundedly), and read_cap bounds the pull.
 ---@param path string
 ---@param count? integer
 ---@return string[]
 local function read_head(path, count)
-	local ok, lines = pcall(function() return count and vim.fn.readfile(path, "", count) or vim.fn.readfile(path) end)
-	return ok and lines or {}
+	local c = vim.uv.constants
+	local fd = vim.uv.fs_open(path, bit.bor(c.O_RDONLY, c.O_NONBLOCK), 0)
+	if not fd then return {} end
+	local fst = vim.uv.fs_fstat(fd)
+	local data = fst ~= nil and fst.type == "file" and vim.uv.fs_read(fd, read_cap, 0) or nil
+	vim.uv.fs_close(fd)
+	if not data then return {} end
+	local lines = vim.split(data, "\n")
+	if lines[#lines] == "" then table.remove(lines) end -- readfile-style: no phantom line after a trailing newline
+	return count and vim.list_slice(lines, 1, count) or lines
 end
 
 ---Whether a theme file is plugin-generated (its first line is the marker).

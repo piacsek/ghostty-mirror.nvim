@@ -288,9 +288,9 @@ scheme. `:ThemeToGhostty` / `:ThemeToTmux` act immediately.
 
 The plugin owns *only* the include file and the themes it generates — never your
 main Ghostty config or hand-made theme files. It also refuses to write through
-a symlink at any of its destinations (the include files and theme cache paths),
-so keep those as regular files — a symlinked parent directory (a dotfiles-style
-`~/.config/ghostty` link) is fine. The directories themselves are trusted as
+a symlink at any of its destinations (the include files and theme cache paths)
+and reads them back only as regular files, so keep those as regular files — a
+symlinked parent directory (a dotfiles-style `~/.config/ghostty` link) is fine. The directories themselves are trusted as
 configured: the symlink refusal guards the files, not where their directories
 point, so writes and cache deletions follow wherever the configured paths lead.
 

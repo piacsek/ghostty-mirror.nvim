@@ -249,6 +249,33 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
+	describe("non-regular read sources", function()
+		it("read_current refuses a FIFO planted at theme_file without blocking", function()
+			with_tmp_dir(function(dir)
+				local theme_file = dir .. "/theme-current"
+				vim.system({ "mkfifo", theme_file }):wait()
+				local mirror = fresh_require()
+				mirror.setup({ theme_file = theme_file })
+				assert.is_nil(mirror.read_current())
+			end)
+		end)
+
+		it("read_current does not parse past the read cap of an oversized file", function()
+			with_tmp_dir(function(dir)
+				local theme_file = dir .. "/theme-current"
+				local lines = {}
+				for _ = 1, 2048 do
+					table.insert(lines, string.rep("#", 32))
+				end
+				table.insert(lines, "theme = elflord")
+				vim.fn.writefile(lines, theme_file)
+				local mirror = fresh_require()
+				mirror.setup({ theme_file = theme_file })
+				assert.is_nil(mirror.read_current())
+			end)
+		end)
+	end)
+
 	describe("hostile colorscheme names", function()
 		it("resolve refuses a path-traversal name and writes nothing", function()
 			with_palette(function()
