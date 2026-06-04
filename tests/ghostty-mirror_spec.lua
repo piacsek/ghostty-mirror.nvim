@@ -1951,6 +1951,44 @@ describe("ghostty-mirror", function()
 				assert.same({ "theme = default" }, vim.fn.readfile(theme_file))
 			end)
 		end)
+
+		it("a debounced push also mirrors only the settled scheme to tmux", function()
+			with_tmp_dir(function(dir)
+				local g, t = dir .. "/g", dir .. "/t"
+				vim.fn.mkdir(g, "p")
+				vim.fn.mkdir(t, "p")
+				for _, n in ipairs({ "elflord", "habamax", "default" }) do
+					vim.fn.writefile({ "" }, g .. "/" .. n)
+					vim.fn.writefile({ "" }, t .. "/" .. n .. ".conf")
+				end
+
+				local calls, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = g,
+					theme_file = dir .. "/g-current",
+					reload_command = { "echo" },
+					debounce_ms = 40,
+					tmux = {
+						enabled = true,
+						themes_dir = t,
+						theme_file = dir .. "/t-current.conf",
+						reload_command = { "echo" },
+					},
+				})
+				vim.cmd.colorscheme("elflord")
+				vim.cmd.colorscheme("habamax")
+				vim.cmd.colorscheme("default")
+				assert.equals(0, #calls)
+				vim.wait(400, function() return #calls >= 2 end)
+				restore()
+
+				-- one Ghostty reload + one tmux source for the settled scheme only
+				assert.equals(2, #calls)
+				assert.same({ "theme = default" }, vim.fn.readfile(dir .. "/g-current"))
+				assert.same({ 'source-file "' .. t .. '/default.conf"' }, vim.fn.readfile(dir .. "/t-current.conf"))
+			end)
+		end)
 	end)
 
 	describe("integration: palette ownership", function()
@@ -2323,6 +2361,49 @@ describe("ghostty-mirror", function()
 				for i = 0, 15 do
 					vim.g["terminal_color_" .. i] = saved_pal[i]
 				end
+				vim.o.background = saved_bg
+			end)
+		end)
+	end)
+
+	describe("manage_background + tmux", function()
+		it("the &background sync leaves Ghostty and tmux pointing at the same theme", function()
+			with_tmp_dir(function(dir)
+				-- a real, loadable light scheme that does not set &background itself
+				local rtp = dir .. "/rtp"
+				vim.fn.mkdir(rtp .. "/colors", "p")
+				vim.fn.writefile({
+					'vim.g.colors_name = "gm_tmuxlight"',
+					'vim.api.nvim_set_hl(0, "Normal", { fg = 0x222222, bg = 0xeeeeee })',
+				}, rtp .. "/colors/gm_tmuxlight.lua")
+				vim.opt.runtimepath:prepend(rtp)
+				local saved_bg = vim.o.background
+				local calls, restore = stub_system()
+				local mirror = fresh_require()
+				mirror.setup({
+					themes_dir = dir .. "/g",
+					theme_file = dir .. "/g-current",
+					reload_command = { "echo" },
+					debounce_ms = 0,
+					manage_background = true,
+					tmux = {
+						enabled = true,
+						themes_dir = dir .. "/t",
+						theme_file = dir .. "/t-current.conf",
+						reload_command = { "echo" },
+					},
+				})
+				vim.o.background = "dark"
+				vim.cmd.colorscheme("gm_tmuxlight")
+				restore()
+				vim.opt.runtimepath:remove(rtp)
+				assert.equals("light", vim.o.background)
+				assert.equals(2, #calls) -- one Ghostty reload + one tmux source
+				local name = mirror.read_current()
+				assert.is_not_nil(name)
+				local pointer = vim.fn.readfile(dir .. "/t-current.conf")[1]
+				assert.equals(('source-file "%s/t/%s.conf"'):format(dir, name), pointer)
+				assert.equals(1, vim.fn.filereadable(("%s/t/%s.conf"):format(dir, name)))
 				vim.o.background = saved_bg
 			end)
 		end)
