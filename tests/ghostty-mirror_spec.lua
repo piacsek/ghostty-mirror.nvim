@@ -1971,6 +1971,19 @@ describe("ghostty-mirror", function()
 			assert.equals(false, mirror.config.light_variant_suffix)
 		end)
 
+		it("rejects tmux paths carrying quotes or newlines, naming the field", function()
+			-- tmux.themes_dir is interpolated into the quoted `source-file "..."`
+			-- line in a file tmux executes; a quote or newline escapes the quoting.
+			for _, field in ipairs({ "themes_dir", "theme_file" }) do
+				for _, bad in ipairs({ '/tmp/x"y', "/tmp/x\ny" }) do
+					local mirror = fresh_require()
+					local ok, err = pcall(mirror.setup, { tmux = { [field] = bad } })
+					assert.is_false(ok, ("tmux.%s %q was accepted"):format(field, bad))
+					assert.is_truthy(tostring(err):find("tmux." .. field, 1, true))
+				end
+			end
+		end)
+
 		it("rejects a light_variant_suffix carrying path or quoting characters, naming the field", function()
 			-- The suffix is appended to an already-validated colorscheme name and
 			-- flows into file paths and the Ghostty/tmux pointer lines, so it must

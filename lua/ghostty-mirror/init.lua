@@ -44,8 +44,8 @@ local M = {}
 
 ---@class GhosttyMirrorTmuxConfig
 ---@field enabled? boolean Mirror the colorscheme into tmux's statusline on :colorscheme. Defaults to false (opt-in).
----@field themes_dir? string Directory tmux theme files live in / are cached to. Defaults to ~/.config/tmux/themes.
----@field theme_file? string Pointer file tmux sources; the plugin writes `source-file <themes_dir>/<name>.conf` here. Defaults to ~/.config/tmux/theme-current.conf.
+---@field themes_dir? string Directory tmux theme files live in / are cached to. No quotes or newlines (it lands inside the pointer's quoted source-file line); setup() errors otherwise. Defaults to ~/.config/tmux/themes.
+---@field theme_file? string Pointer file tmux sources; the plugin writes `source-file <themes_dir>/<name>.conf` here. No quotes or newlines; setup() errors otherwise. Defaults to ~/.config/tmux/theme-current.conf.
 ---@field generate? boolean Generate a tmux theme from live highlights when no hand-made file exists. Defaults to true.
 ---@field reload_command? string[]|nil Command to apply the theme to the running tmux server. nil uses `tmux source-file <theme_file>`.
 ---@field bar_blend? number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
@@ -890,6 +890,13 @@ function M.setup(opts)
 			),
 			0
 		)
+	end
+	-- tmux.themes_dir is interpolated into the quoted `source-file "..."` line
+	-- in a file tmux executes, so a quote or newline escapes the quoting there.
+	for _, field in ipairs({ "themes_dir", "theme_file" }) do
+		if M.config.tmux[field]:match('["\n]') then
+			error(("ghostty-mirror: config.tmux.%s must not contain quotes or newlines"):format(field), 0)
+		end
 	end
 	validate_overrides(M.config.overrides, ghostty_override_params, "ghostty ")
 	validate_overrides(M.config.tmux.overrides, tmux_override_params, "tmux ")
