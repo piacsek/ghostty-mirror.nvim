@@ -183,12 +183,15 @@ local function readable_on(color, x, y)
 	return luminance(color) < 0.5 and lighter or darker
 end
 
----Snapshot the live terminal palette (g:terminal_color_0..15).
+---Snapshot the live terminal palette (g:terminal_color_0..15). Slots are
+---normalized to clean "#rrggbb" — these values are concatenated into a file
+---Ghostty parses, so anything else (a newline would smuggle in an arbitrary
+---directive) becomes nil and the palette drops at the completeness gate.
 ---@return table<integer, string|nil>
 local function snapshot_palette()
 	local p = {}
 	for i = 0, 15 do
-		p[i] = vim.g["terminal_color_" .. i]
+		p[i] = normalize_color(vim.g["terminal_color_" .. i])
 	end
 	return p
 end
@@ -204,12 +207,12 @@ local function palettes_equal(a, b)
 	return true
 end
 
----Whether a palette snapshot has a non-empty string in all 16 slots.
+---Whether a palette snapshot has a (normalized) color in all 16 slots.
 ---@param p table<integer, string|nil>
 ---@return boolean
 local function palette_complete(p)
 	for i = 0, 15 do
-		if type(p[i]) ~= "string" or p[i] == "" then return false end
+		if p[i] == nil then return false end
 	end
 	return true
 end

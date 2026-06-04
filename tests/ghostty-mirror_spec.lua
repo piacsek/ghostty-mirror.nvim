@@ -381,6 +381,27 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("omits the palette when a slot smuggles a directive behind a newline", function()
+			with_palette(function()
+				vim.g.terminal_color_5 = "#000000\ncommand = evil"
+				local mirror = fresh_require()
+				mirror.setup({ generate = true })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_nil(joined:find("command = evil", 1, true))
+				assert.is_nil(joined:find("palette = ", 1, true))
+			end)
+		end)
+
+		it("normalizes shorthand and uppercase palette slots instead of dropping the palette", function()
+			with_palette(function()
+				vim.g.terminal_color_5 = "#F00"
+				local mirror = fresh_require()
+				mirror.setup({ generate = true })
+				local joined = table.concat(mirror.generate("mytheme"), "\n")
+				assert.is_truthy(joined:find("palette = 5=#ff0000", 1, true))
+			end)
+		end)
+
 		it("returns nil when the colorscheme has no Normal fg/bg to anchor the theme", function()
 			with_palette(function()
 				vim.api.nvim_set_hl(0, "Normal", {})
