@@ -425,6 +425,10 @@ end
 ---@param colorscheme string
 ---@return string[]|nil
 function M.generate(colorscheme)
+	-- The name lands verbatim in the header line below; live callers guard via
+	-- write_generated, but this is public API, so a newline-carrying name must
+	-- die here too, not ride out in the returned lines.
+	if not valid_name(colorscheme) then return nil end
 	local normal = hl("Normal")
 	local bg, fg = hex(normal.bg), hex(normal.fg)
 	-- The anchor rule stands even under overrides: they tweak a theme the
@@ -483,6 +487,9 @@ end
 ---@param colorscheme string
 ---@return string[]|nil
 function M.generate_tmux(colorscheme)
+	-- Same self-guard as generate: the header line is part of a file tmux
+	-- executes, so a newline-carrying name must die here, not in some caller.
+	if not valid_name(colorscheme) then return nil end
 	local normal = hl("Normal")
 	local bg, fg = hex(normal.bg), hex(normal.fg)
 	if not bg or not fg then return nil end

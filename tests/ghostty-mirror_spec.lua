@@ -333,6 +333,27 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("generate refuses a newline-injecting name itself", function()
+			with_palette(function()
+				-- The name lands verbatim in the returned header line; a newline in
+				-- it carries an injected directive. All internal callers guard via
+				-- write_generated, but generate is public API and must self-guard.
+				local mirror = fresh_require()
+				mirror.setup({ generate = true })
+				assert.is_nil(mirror.generate("foo\nbackground = #ff0000"))
+			end)
+		end)
+
+		it("generate_tmux refuses a newline-injecting name itself", function()
+			with_palette(function()
+				-- Same self-guard as generate: the header line is part of a file
+				-- tmux executes, so a newline carries an injected command.
+				local mirror = fresh_require()
+				mirror.setup({ tmux = { enabled = true } })
+				assert.is_nil(mirror.generate_tmux("foo\nrun-shell evil"))
+			end)
+		end)
+
 		it("resolve and resolve_tmux refuse the bare dot names", function()
 			with_tmp_dir(function(dir)
 				local mirror = fresh_require()
