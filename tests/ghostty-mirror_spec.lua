@@ -3207,6 +3207,27 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("refuses a FIFO planted at the config path without blocking", function()
+			with_tmp_dir(function(dir)
+				vim.system({ "mkfifo", dir .. "/config" }):wait()
+				local h = with_health(dir, nil)
+				local e = include_entry(h)
+				assert.equals("warn", e.status)
+			end)
+		end)
+
+		it("does not parse an include past the read cap of an oversized config", function()
+			with_tmp_dir(function(dir)
+				local lines = {}
+				for _ = 1, 8192 do
+					table.insert(lines, "# " .. string.rep("x", 30))
+				end
+				table.insert(lines, "config-file = ?" .. dir .. "/theme-current")
+				local h = with_health(dir, lines)
+				assert.equals("warn", include_entry(h).status)
+			end)
+		end)
+
 		it("finds the include in a later candidate config when the first lacks it", function()
 			with_tmp_dir(function(dir)
 				local mirror = fresh_require()

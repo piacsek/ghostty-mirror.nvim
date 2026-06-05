@@ -34,6 +34,31 @@ local function canonical(path)
 	return vim.fn.fnamemodify(path, ":p")
 end
 
+-- Byte ceiling on the config read. Larger than init.lua's read_cap because
+-- the main Ghostty config is a real user file (keybinds, includes), not a
+-- tiny pointer file — but still bounds what a planted file can make
+-- :checkhealth pull into memory.
+local read_cap = 256 * 1024
+
+---Read a config's lines, guarded like init.lua's read_head: the path sits at
+---a predictable location, so O_NONBLOCK keeps a planted FIFO from hanging the
+---open, the fstat type check refuses special files, and read_cap bounds the
+---pull. Unreadable reads as empty rather than throwing.
+---@param path string
+---@return string[]
+local function read_lines(path)
+	local c = vim.uv.constants
+	local fd = vim.uv.fs_open(path, bit.bor(c.O_RDONLY, c.O_NONBLOCK), 0)
+	if not fd then return {} end
+	local fst = vim.uv.fs_fstat(fd)
+	local data = fst ~= nil and fst.type == "file" and vim.uv.fs_read(fd, read_cap, 0) or nil
+	vim.uv.fs_close(fd)
+	if not data then return {} end
+	local lines = vim.split(data, "\n")
+	if lines[#lines] == "" then table.remove(lines) end
+	return lines
+end
+
 ---Whether a Ghostty config file has a top-level `config-file` directive
 ---pointing at `theme_file`. Handles the optional-`?` prefix, quoted values,
 ---`~`, and paths relative to the config's own directory (Ghostty resolves
@@ -44,7 +69,7 @@ end
 local function includes_theme_file(config, theme_file)
 	local dir = vim.fn.fnamemodify(config, ":h")
 	local want = canonical(theme_file)
-	for _, line in ipairs(vim.fn.readfile(config)) do
+	for _, line in ipairs(read_lines(config)) do
 		local value = line:match("^%s*config%-file%s*=%s*(.-)%s*$")
 		if value then
 			value = value:match('^"(.*)"$') or value
