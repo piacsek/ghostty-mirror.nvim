@@ -170,6 +170,22 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("write_generated refuses to write through a hard link at the cache path", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/themes"
+					vim.fn.mkdir(themes_dir, "p")
+					local victim = dir .. "/victim"
+					vim.fn.writefile({ "precious" }, victim)
+					vim.uv.fs_link(victim, themes_dir .. "/mytheme")
+					local mirror = fresh_require()
+					mirror.setup({ themes_dir = themes_dir, generate = true })
+					assert.is_nil(mirror.write_generated("mytheme"))
+					assert.same({ "precious" }, vim.fn.readfile(victim))
+				end)
+			end)
+		end)
+
 		it("a dangling symlink at the cache path does not create its target", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)

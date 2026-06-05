@@ -112,6 +112,10 @@ local function valid_name(name) return name:match(safe_name_pattern) ~= nil and 
 ---because O_CREAT alone follows a dangling link and creates its target (the
 ---proof then refuses the write, but the empty file already landed); O_EXCL
 ---never follows a link, failing EEXIST even on a dangling one.
+---A planted *hard* link defeats the inode proof (fstat and lstat agree by
+---construction), so the proof also requires nlink == 1: a fresh O_EXCL file
+---and any honest pointer/theme file has exactly one name; a hard link to a
+---victim never does.
 ---Returns whether the write happened — fail silently, never wrongly.
 ---@param lines string[]
 ---@param path string
@@ -129,6 +133,7 @@ local function write_no_symlink(lines, path)
 		and lst.type == "file"
 		and fst.ino == lst.ino
 		and fst.dev == lst.dev
+		and fst.nlink == 1
 	if not same_file then
 		vim.uv.fs_close(fd)
 		return false
