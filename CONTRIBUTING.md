@@ -30,8 +30,15 @@ Both must pass; CI runs them on Neovim stable and nightly for every push and PR.
 - **Indentation is tabs** in Lua sources. `stylua .` fixes formatting.
 - **LuaCATS annotations** on every public function and config field, matching
   the existing density.
-- **Fail silently, never wrongly:** on missing or incomplete inputs, no-op
-  rather than writing something Ghostty can't load.
+- **No-op, but never silently:** never write something Ghostty can't load —
+  on missing or invalid inputs, skip the write. But don't leave the user
+  guessing: config is parsed and validated, and a value that can't take
+  effect draws a `vim.notify(..., vim.log.levels.WARN)` explaining what was
+  rejected (see the setup-time override warnings for the pattern).
+  Environment problems — Ghostty not running, the `config-file` include
+  missing, unwritable paths — belong in `lua/ghostty-mirror/health.lua`
+  instead: when adding behavior that depends on the environment, extend
+  `:checkhealth ghostty-mirror` (its `M.diagnostics` is unit-testable).
 - New config options need a default in `defaults`, a `---@field` doc, a
   `README.md` entry, and a `doc/ghostty-mirror.txt` entry — the README and
   vimdoc must not drift.

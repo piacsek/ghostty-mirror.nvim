@@ -83,7 +83,7 @@ additionally need a full Ghostty restart.)
 - **Comments:** explain *why*, not *what*. Terse. The existing files set the bar.
 - **Neovim APIs:** prefer `vim.uv`, `vim.system`, `vim.api.nvim_*`, `vim.fn.*` over shelling out. Detach long-running subprocesses (`{ detach = true }`).
 - **Config:** all behavior is driven by `M.config` merged from `defaults` via `vim.tbl_deep_extend("force", ...)`. New options need a default, a `---@field` doc, a README entry, and a vimdoc entry.
-- **Fail silently, never wrongly:** when inputs are missing/incomplete, no-op rather than writing something Ghostty can't load or that looks wrong.
+- **No-op, but never silently:** when inputs are missing/incomplete, no-op rather than writing something Ghostty can't load or that looks wrong — but config is always parsed/validated and a rejected value draws a `vim.notify(..., WARN)` saying why (the setup-time override warnings are the pattern). Environment issues (Ghostty not running, include not wired, bad paths) surface through `health.lua` diagnostics, not notifications — keep `:checkhealth` thorough when adding environment-dependent behavior.
 
 ## Workflow
 
