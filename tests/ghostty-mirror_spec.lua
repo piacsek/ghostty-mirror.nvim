@@ -137,8 +137,8 @@ describe("ghostty-mirror", function()
 		end)
 	end)
 
-	describe("symlinked write destinations", function()
-		it("write_generated refuses to write through a symlinked cache path", function()
+	describe("atomic writes and planted destinations", function()
+		it("write_generated replaces a symlinked cache path without touching its target", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local themes_dir = dir .. "/themes"
@@ -148,13 +148,14 @@ describe("ghostty-mirror", function()
 					vim.uv.fs_symlink(victim, themes_dir .. "/mytheme")
 					local mirror = fresh_require()
 					mirror.setup({ themes_dir = themes_dir, generate = true })
-					assert.is_nil(mirror.write_generated("mytheme"))
+					assert.equals("mytheme", mirror.write_generated("mytheme"))
 					assert.same({ "precious" }, vim.fn.readfile(victim))
+					assert.equals("file", vim.uv.fs_lstat(themes_dir .. "/mytheme").type)
 				end)
 			end)
 		end)
 
-		it("write_tmux_generated refuses to write through a symlinked cache path", function()
+		it("write_tmux_generated replaces a symlinked cache path without touching its target", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local themes_dir = dir .. "/themes"
@@ -164,13 +165,14 @@ describe("ghostty-mirror", function()
 					vim.uv.fs_symlink(victim, themes_dir .. "/mytheme.conf")
 					local mirror = fresh_require()
 					mirror.setup({ tmux = { enabled = true, themes_dir = themes_dir } })
-					assert.is_nil(mirror.write_tmux_generated("mytheme"))
+					assert.equals("mytheme", mirror.write_tmux_generated("mytheme"))
 					assert.same({ "precious" }, vim.fn.readfile(victim))
+					assert.equals("file", vim.uv.fs_lstat(themes_dir .. "/mytheme.conf").type)
 				end)
 			end)
 		end)
 
-		it("write_generated refuses to write through a hard link at the cache path", function()
+		it("write_generated replaces a hard link at the cache path without touching its target", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local themes_dir = dir .. "/themes"
@@ -180,13 +182,14 @@ describe("ghostty-mirror", function()
 					vim.uv.fs_link(victim, themes_dir .. "/mytheme")
 					local mirror = fresh_require()
 					mirror.setup({ themes_dir = themes_dir, generate = true })
-					assert.is_nil(mirror.write_generated("mytheme"))
+					assert.equals("mytheme", mirror.write_generated("mytheme"))
 					assert.same({ "precious" }, vim.fn.readfile(victim))
+					assert.equals(1, vim.uv.fs_stat(victim).nlink)
 				end)
 			end)
 		end)
 
-		it("a dangling symlink at the cache path does not create its target", function()
+		it("a dangling symlink at the cache path is replaced, not its target created", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local themes_dir = dir .. "/themes"
@@ -195,13 +198,14 @@ describe("ghostty-mirror", function()
 					vim.uv.fs_symlink(victim, themes_dir .. "/mytheme")
 					local mirror = fresh_require()
 					mirror.setup({ themes_dir = themes_dir, generate = true })
-					assert.is_nil(mirror.write_generated("mytheme"))
+					assert.equals("mytheme", mirror.write_generated("mytheme"))
 					assert.is_nil(vim.uv.fs_lstat(victim))
+					assert.equals("file", vim.uv.fs_lstat(themes_dir .. "/mytheme").type)
 				end)
 			end)
 		end)
 
-		it("push refuses a symlinked theme_file and skips the reload", function()
+		it("push replaces a symlinked theme_file and reloads, leaving the target untouched", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local themes_dir, theme_file = dir .. "/themes", dir .. "/theme-current"
@@ -215,37 +219,42 @@ describe("ghostty-mirror", function()
 					mirror.push("mytheme", { force = true })
 					restore()
 					assert.same({ "precious" }, vim.fn.readfile(victim))
-					assert.equals(0, #calls)
+					assert.equals("file", vim.uv.fs_lstat(theme_file).type)
+					assert.same({ "theme = mytheme" }, vim.fn.readfile(theme_file))
+					assert.equals(1, #calls)
 				end)
 			end)
 		end)
 
-		it("refuses a symlink swapped in after any pre-write check (TOCTOU)", function()
+		it("a failed write leaves neither a temp file nor a destination behind", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local themes_dir = dir .. "/themes"
 					vim.fn.mkdir(themes_dir, "p")
-					local victim = dir .. "/victim"
-					vim.fn.writefile({ "precious" }, victim)
-					vim.uv.fs_symlink(victim, themes_dir .. "/mytheme")
-					-- Simulate the racer winning: every path-based lstat is fooled
-					-- into seeing a plain regular file, yet the link is in place when
-					-- the write happens. Only refusing at the fd level (the opened
-					-- inode is not the path's) protects the victim here.
-					local real_lstat = vim.uv.fs_lstat
-					vim.uv.fs_lstat = function() return { type = "file", ino = 0, dev = 0 } end ---@diagnostic disable-line: duplicate-set-field
+					-- Simulate a partial write (disk full, signal): fs_write reports
+					-- fewer bytes than asked. The temp must be cleaned up and the
+					-- destination never appear — readers keep whatever was there.
+					local real_write = vim.uv.fs_write
+					vim.uv.fs_write = function(fd, data, offset) ---@diagnostic disable-line: duplicate-set-field
+						real_write(fd, data, offset)
+						return #data - 1
+					end
 					local mirror = fresh_require()
 					mirror.setup({ themes_dir = themes_dir, generate = true })
 					local ok, result = pcall(mirror.write_generated, "mytheme")
-					vim.uv.fs_lstat = real_lstat
+					vim.uv.fs_write = real_write
 					assert.is_true(ok, tostring(result))
 					assert.is_nil(result)
-					assert.same({ "precious" }, vim.fn.readfile(victim))
+					local entries = {}
+					for name in vim.fs.dir(themes_dir) do
+						table.insert(entries, name)
+					end
+					assert.same({}, entries)
 				end)
 			end)
 		end)
 
-		it("push_tmux refuses a symlinked tmux theme_file and skips the reload", function()
+		it("push_tmux replaces a symlinked tmux theme_file and reloads, leaving the target untouched", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)
 					local themes_dir, theme_file = dir .. "/themes", dir .. "/theme-current.conf"
@@ -259,7 +268,8 @@ describe("ghostty-mirror", function()
 					mirror.push_tmux("mytheme", { force = true })
 					restore()
 					assert.same({ "precious" }, vim.fn.readfile(victim))
-					assert.equals(0, #calls)
+					assert.equals("file", vim.uv.fs_lstat(theme_file).type)
+					assert.equals(1, #calls)
 				end)
 			end)
 		end)

@@ -100,47 +100,39 @@ local safe_name_pattern = "^[%w._%-]+$"
 ---@return boolean
 local function valid_name(name) return name:match(safe_name_pattern) ~= nil and name ~= "." and name ~= ".." end
 
----Write lines to a path, refusing to write through a symlink: a pre-planted
----link would silently redirect a plugin write into an arbitrary file. A
----check-then-write would leave a window for a racer to swap a link in
----(TOCTOU), and luv exposes no O_NOFOLLOW, so refuse by proof instead: open
----without truncating, then require the opened fd and the path to be the same
----regular file before a byte is written — a racing link lands on either the
----link itself (lstat) or a foreign inode (fstat) and is refused. O_NONBLOCK
----keeps a planted FIFO from hanging the open; it's a no-op for regular files.
----The open is two-step — plain first, O_CREAT|O_EXCL only on a missing path —
----because O_CREAT alone follows a dangling link and creates its target (the
----proof then refuses the write, but the empty file already landed); O_EXCL
----never follows a link, failing EEXIST even on a dangling one.
----A planted *hard* link defeats the inode proof (fstat and lstat agree by
----construction), so the proof also requires nlink == 1: a fresh O_EXCL file
----and any honest pointer/theme file has exactly one name; a hard link to a
----victim never does.
+---Write lines to a path atomically: the bytes land in a same-directory
+---O_CREAT|O_EXCL temp file, are fsynced, and the temp is renamed over the
+---destination. A concurrent reader (Ghostty on SIGUSR2, tmux source-file,
+---another instance's read_head) sees the old content or the new, never a
+---torn file, and concurrent writers settle to clean last-writer-wins.
+---The rename also carries the symlink-refusal proof the old in-place write
+---needed per-write inode checks for: O_EXCL never follows a link when
+---creating the temp, and rename *replaces* a planted symlink or hard link
+---at the destination rather than writing through it, so a victim file is
+---never touched (a hard-linked victim just loses one of its names).
+---The temp name is pid-qualified: writes within one instance are serialized
+---by the event loop, so only a leftover from a crashed same-pid writer (or a
+---planted entry) can hold it — O_EXCL refuses, the entry itself is unlinked
+---(unlink doesn't follow links), and one retry settles it.
 ---Returns whether the write happened — fail silently, never wrongly.
 ---@param lines string[]
 ---@param path string
 ---@return boolean
-local function write_no_symlink(lines, path)
+local function write_atomic(lines, path)
 	local c = vim.uv.constants
-	local fd = vim.uv.fs_open(path, bit.bor(c.O_WRONLY, c.O_NONBLOCK), 438) -- 0666, masked by umask like writefile
-	if not fd then fd = vim.uv.fs_open(path, bit.bor(c.O_WRONLY, c.O_CREAT, c.O_EXCL, c.O_NONBLOCK), 438) end
-	if not fd then return false end
-	local fst = vim.uv.fs_fstat(fd)
-	local lst = vim.uv.fs_lstat(path)
-	local same_file = fst ~= nil
-		and lst ~= nil
-		and fst.type == "file"
-		and lst.type == "file"
-		and fst.ino == lst.ino
-		and fst.dev == lst.dev
-		and fst.nlink == 1
-	if not same_file then
-		vim.uv.fs_close(fd)
-		return false
+	local tmp = ("%s.%d.tmp"):format(path, vim.uv.os_getpid())
+	local flags = bit.bor(c.O_WRONLY, c.O_CREAT, c.O_EXCL)
+	local fd = vim.uv.fs_open(tmp, flags, 438) -- 0666, masked by umask like writefile
+	if not fd then
+		vim.uv.fs_unlink(tmp)
+		fd = vim.uv.fs_open(tmp, flags, 438)
+		if not fd then return false end
 	end
 	local data = table.concat(lines, "\n") .. "\n"
-	local ok = vim.uv.fs_ftruncate(fd, 0) ~= nil and vim.uv.fs_write(fd, data) == #data
+	local ok = vim.uv.fs_write(fd, data) == #data and vim.uv.fs_fsync(fd) ~= nil
 	vim.uv.fs_close(fd)
+	ok = ok and vim.uv.fs_rename(tmp, path) ~= nil
+	if not ok then vim.uv.fs_unlink(tmp) end
 	return ok
 end
 
@@ -152,10 +144,10 @@ local read_cap = 16384
 ---Read the first `count` lines of a file (the capped head when count is nil),
 ---tolerating it vanishing or turning unreadable between an fs_stat and the
 ---read (concurrent cache clear, another instance): an unreadable file reads
----as empty rather than throwing. Reads are guarded like writes are: the paths
----are writable by any process, so O_NONBLOCK keeps a planted FIFO from
----hanging the open, the fstat type check refuses special files (a /dev/zero
----link reads unboundedly), and read_cap bounds the pull.
+---as empty rather than throwing. The paths are writable by any process, so
+---the open is guarded: O_NONBLOCK keeps a planted FIFO from hanging it, the
+---fstat type check refuses special files (a /dev/zero link reads
+---unboundedly), and read_cap bounds the pull.
 ---@param path string
 ---@param count? integer
 ---@return string[]
@@ -598,7 +590,7 @@ function M.write_generated(colorscheme)
 	if not lines then return nil end
 	local name = target_name(colorscheme)
 	vim.fn.mkdir(M.config.themes_dir, "p")
-	if not write_no_symlink(lines, M.config.themes_dir .. "/" .. name) then return nil end
+	if not write_atomic(lines, M.config.themes_dir .. "/" .. name) then return nil end
 	return name
 end
 
@@ -613,7 +605,7 @@ function M.write_tmux_generated(colorscheme)
 	if not lines then return nil end
 	local name = target_name(colorscheme)
 	vim.fn.mkdir(M.config.tmux.themes_dir, "p")
-	if not write_no_symlink(lines, M.config.tmux.themes_dir .. "/" .. name .. ".conf") then return nil end
+	if not write_atomic(lines, M.config.tmux.themes_dir .. "/" .. name .. ".conf") then return nil end
 	return name
 end
 
@@ -750,7 +742,7 @@ function M.push(colorscheme, opts)
 	-- cache regenerated under an unchanged pointer still reloads — the file
 	-- content changed. Force always rewrites and reloads.
 	if (opts and opts.force) or regenerated or M.read_current() ~= name then
-		if write_no_symlink({ "theme = " .. name }, M.config.theme_file) then
+		if write_atomic({ "theme = " .. name }, M.config.theme_file) then
 			vim.system(M.config.reload_command, { detach = true })
 		end
 	end
@@ -795,7 +787,7 @@ function M.push_tmux(colorscheme, opts)
 	if not line then return end
 	local current = read_head(cfg.theme_file, 1)[1]
 	if (opts and opts.force) or regenerated or current ~= line then
-		if write_no_symlink({ line }, cfg.theme_file) then
+		if write_atomic({ line }, cfg.theme_file) then
 			vim.system(cfg.reload_command or { "tmux", "source-file", cfg.theme_file }, { detach = true })
 		end
 	end

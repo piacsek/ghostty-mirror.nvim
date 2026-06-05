@@ -50,8 +50,11 @@ accepted) is noise, not signal.
    - The marker-line ownership model — a file whose first line is the generated
      marker is plugin-owned and may be cleared/regenerated. Documented.
    - A symlinked *themes_dir directory component* redirecting writes/deletes —
-     `write_no_symlink` guards the leaf only; the dirs are assumed real
+     `write_atomic` guards the leaf only; the dirs are assumed real
      directories (stated trust assumption).
+   - A planted symlink/hard link *at a write destination* being **replaced** by
+     the atomic rename (target untouched). Replacing the entry is the designed
+     leaf defense, not a clobbering bug — last-writer-wins on the entry itself.
 
    Re-raise one of these *only* if the code changed such that the reasoning no
    longer holds (e.g. a default flipped to on, or a name reaches a sink
@@ -102,7 +105,7 @@ the defense outward, not from the file top-down.
 
 1. **Enumerate every peer of each defended sink.** When you find a guard
    (`valid_name`, `normalize_color`/`hex`, the hardened `read_head` open,
-   `write_no_symlink`), do not just confirm it where you found it — list *every*
+   `write_atomic`), do not just confirm it where you found it — list *every*
    call site of that sink class and verify the guard is present at each. The
    historical misses were exactly the unguarded peer: `pull` while the writes
    were guarded; the public generators while `write_generated` was guarded;
@@ -120,7 +123,7 @@ the defense outward, not from the file top-down.
    - File reads → the hardened open (`O_NONBLOCK` + fstat `type == "file"` +
      byte cap): `read_head`, `health.lua`'s config read, and any raw
      `readfile`/`io.open`/`vim.fn.readfile` anywhere.
-   - File writes → `write_no_symlink`: every `writefile`/`fs_write` sink.
+   - File writes → `write_atomic`: every `writefile`/`fs_write` sink.
 
 2. **Walk the filesystem-hostile-object matrix at every `fs_open`.** Each prior
    scan found one more row. Check all of them, for both the read and write opens,
@@ -128,13 +131,14 @@ the defense outward, not from the file top-down.
 
    | Object planted at the path | Concern | Defense to confirm |
    |---|---|---|
-   | Live symlink | write/read redirected to target | fstat/lstat same-inode proof; `O_NONBLOCK` |
-   | Dangling symlink | `O_CREAT` follows it and creates the target | two-step open, `O_EXCL` on the create branch |
-   | **Hard link** | both stats agree (same regular-file inode); proof passes; write lands in the link target | `fst.nlink == 1` in the proof |
-   | FIFO / special device | `open`/`read` blocks or reads unboundedly | `O_NONBLOCK` + fstat `type == "file"` + read cap |
-   | Directory | open/write misbehaves | fstat type check |
-   | Swapped between check and act (TOCTOU) | guard proves a different inode than the one written | act on the fd, not a re-looked-up path |
-   | Concurrent reader mid-write | torn / partial file observed; short `fs_write` leaves truncated file | atomic write (temp + `fs_rename`) vs. in-place truncate |
+   | Live symlink | write/read redirected to target | writes: `O_EXCL` temp + `fs_rename` replaces the link, never follows it; reads: fstat `type == "file"` + `O_NONBLOCK` |
+   | Dangling symlink | `O_CREAT` follows it and creates the target | the temp open is `O_CREAT\|O_EXCL` (never follows); rename replaces the link entry |
+   | **Hard link** | write lands in the link target | rename swaps the directory entry; the target inode is never opened |
+   | FIFO / special device | `open`/`read` blocks or reads unboundedly | reads: `O_NONBLOCK` + fstat `type == "file"` + read cap; writes never open the destination |
+   | Directory | open/write misbehaves | fstat type check on reads; `fs_rename` over a directory fails |
+   | Swapped between check and act (TOCTOU) | guard proves a different object than the one written | no path-based pre-write checks exist; the rename is the act |
+   | Concurrent reader mid-write | torn / partial file observed | temp + fsync + `fs_rename`: readers see old or new, never a mix; a failed write unlinks the temp and leaves the destination alone |
+   | Planted entry at the predictable temp name (`<path>.<pid>.tmp`) | `O_EXCL` create fails; write wedges | unlink-the-entry-and-retry-once in `write_atomic` (unlink doesn't follow links) |
 
 3. **Validate config at the sink, not only at `setup()`.** `M.config` is plain
    data; any plugin can mutate it after setup. For every config value that
@@ -187,7 +191,7 @@ the defense outward, not from the file top-down.
    (`.claude/settings.local.json`); anything in the repo that would execute on a
    user's machine at install time beyond `plugin/ghostty-mirror.lua`.
 
-Method: grep for the sinks (`vim.system|vim.fn.system|os.execute|io.popen|writefile|fs_write|fs_open|delete\(|mkdir|vim.cmd|source-file|readfile`), then trace each argument back to its source. Read `valid_name`, `write_no_symlink`, `read_head`, and every caller; the interesting bugs are the paths that *skip* the guard (Completeness method 1).
+Method: grep for the sinks (`vim.system|vim.fn.system|os.execute|io.popen|writefile|fs_write|fs_open|delete\(|mkdir|vim.cmd|source-file|readfile`), then trace each argument back to its source. Read `valid_name`, `write_atomic`, `read_head`, and every caller; the interesting bugs are the paths that *skip* the guard (Completeness method 1).
 
 ## Report format
 

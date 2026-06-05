@@ -22,13 +22,16 @@ A theme is resolved by precedence: a hand-made or cached file at
 "light"); otherwise one is generated from live highlights and cached. The
 plugin owns only the include file and the themes it generates — never your
 main Ghostty config or hand-made theme files (a banged |:ThemeToGhostty|! /
-|:ThemeToTmux|! is the one deliberate exception). It also refuses to write
-through a symlink or hard link at any of its destinations (the include files
-and theme cache paths) and reads them back only as regular files, so keep
-those as plain single-name regular files — a symlinked parent directory is
-fine. The directories themselves are trusted as configured: the link
-refusal guards the files, not where their directories point, so writes and
-cache deletions follow wherever the configured paths lead.
+|:ThemeToTmux|! is the one deliberate exception). Writes are atomic: each
+lands in a temp file renamed over the destination, so Ghostty, tmux, or
+another nvim instance reading mid-write sees the old content or the new,
+never a torn file, and concurrent instances settle to last-writer-wins. The
+rename means a symlink or hard link sitting at a destination (the include
+files and theme cache paths) is replaced by a plain file, never written
+through, and reads come back only from regular files — so keep those as
+plain single-name regular files; a symlinked parent directory is fine. The
+directories themselves are trusted as configured: writes and cache deletions
+follow wherever the configured paths lead.
 
 Requires Neovim 0.10+.
 
