@@ -2520,6 +2520,14 @@ describe("ghostty-mirror", function()
 	end)
 
 	describe("setup: idempotent re-setup", function()
+		it("re-setup restores a default mutated through an omitted-key subtable", function()
+			local mirror = fresh_require()
+			mirror.setup({ debounce_ms = 0 })
+			mirror.config.tmux.bar_blend = 0.9
+			mirror.setup({ debounce_ms = 0 })
+			assert.equals(0.22, mirror.config.tmux.bar_blend)
+		end)
+
 		it("cancels a pending debounced push from a prior setup", function()
 			with_tmp_dir(function(dir)
 				local themes_dir = dir .. "/themes"

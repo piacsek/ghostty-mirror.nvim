@@ -1030,7 +1030,10 @@ function M.setup(opts)
 		return
 	end
 
-	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
+	-- Merge over a copy: tbl_deep_extend assigns omitted-key subtables by
+	-- reference, so a later mutation of M.config would otherwise pollute
+	-- `defaults` itself and survive a re-setup as the new baseline.
+	M.config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
 	validate_config(M.config, config_types, "")
 	validate_config(M.config.tmux, tmux_config_types, "tmux.")
 	-- The suffix is appended to an already-validated colorscheme name, flowing
