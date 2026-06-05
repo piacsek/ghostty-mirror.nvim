@@ -1,8 +1,10 @@
 # Roadmap
 
 Milestones for ghostty-mirror.nvim, newest first (planned work at the top).
+Major and minor versions only — patch releases are documented in the
+[GitHub releases](https://github.com/piacsek/ghostty-mirror.nvim/releases).
 
-## 0.6.0 — Granular tmux overrides (planned)
+## 0.7.0 — Granular tmux overrides (planned)
 
 Detach the tmux colors that are currently welded to the single `accent`
 input, starting with `copy_mode`: today `mode-style` (the copy-mode mouse
@@ -12,23 +14,15 @@ selection text contrast-picked and everything else (pill, active border,
 status-right, clock) staying on `accent`. Unset keeps today's output
 byte-identical. Further params may follow the same pattern as needs surface.
 
-## 0.5.2 — Pull resilience + coverage backfill
+## 0.6.0 — Force-push safety and link-proof writes
 
-`:ThemeFromGhostty` now warns (naming the scheme and `theme_file`) instead
-of throwing a raw E185 when the pointer names a colorscheme this instance
-doesn't have installed — matching the existing unreadable-file warning and
-the pcall'd sync paths. The rest is the test-coverage backfill from the
-audit in issue #7: tmux health diagnostics, health edge branches, generate's
-cursor fg-only fallback, debounce and manage_background under tmux, and the
-plugin auto-setup guard (158 to 177 specs).
-
-## 0.5.1 — Health: include wiring
-
-`:checkhealth ghostty-mirror` now detects the most common setup miss: a
-Ghostty config that never reads `theme_file` because the `config-file`
-include line is absent. The check scans the XDG and macOS config locations,
-understands the optional-`?` prefix, quoted values, `~`, and
-config-dir-relative paths, and warns with the exact line to add.
+Both actionable findings from the security scan in issue #15.
+`:ThemeToGhostty`/`:ThemeToTmux` now refuse to overwrite a hand-made theme
+file unless banged (`:ThemeToGhostty!`), closing the one path where the
+plugin could destroy a file it doesn't own — `M.push`/`M.push_tmux` grew a
+matching `clobber` opt. And the write proof that refuses symlinked
+destinations now refuses hard links too (`nlink == 1`), so a planted link of
+either kind can't redirect a theme write into another file.
 
 ## 0.5.0 — Per-theme Ghostty overrides
 
@@ -43,7 +37,11 @@ highlight-derived colors, and hand-made files stay untouched. Deliberately
 no `background` param — the terminal background diverging from the editor's
 is the mismatch the plugin exists to prevent. Docs gained a "Who paints
 what" table mapping each pixel to the layer that owns it (nvim highlights,
-tmux copy-mode, Ghostty).
+tmux copy-mode, Ghostty). Later 0.5.x patches taught `:checkhealth` to flag
+a missing `config-file` include line, made `:ThemeFromGhostty` warn instead
+of throw on an uninstalled scheme, backfilled the issue #7 coverage audit,
+and worked through a series of security reviews' filesystem hardening
+(issues #8–#14).
 
 ## 0.4.0 — Per-theme tmux overrides
 
@@ -57,25 +55,6 @@ effect (unknown theme, unknown param, invalid value), and hand-made themes
 keep winning, untouched. Also fixed the startup/focus sync to re-fire the
 mirror chain (`nested` autocmds) and sandboxed `$HOME` in the test suite so
 specs can never touch a real Ghostty/tmux config.
-
-## 0.3.1 — Hardening and coverage
-
-Worked through an external code review (issue #3) end to end:
-
-- **Name sanitization** — colorscheme names are gated on a safe character
-  whitelist before reaching filesystem paths, the Ghostty pointer file, or the
-  tmux `source-file` command, closing path-traversal and injection routes.
-- **Config validation** — `setup` fails fast with the offending field's name
-  on a misshapen config (e.g. `tmux = true`) instead of erroring deep inside a
-  later push.
-- **Setup lifecycle** — a pending debounced push is cancelled on re-`setup()`
-  and at shutdown, so stale pushes can't fire under a new config or into a
-  dying editor.
-- **Version floor** — Neovim 0.10+ is enforced at setup with a clear error and
-  documented in README and vimdoc.
-- **Coverage** — the suite grew from 74 to 90 specs, pinning the
-  generate/clear-cache marker round-trip, the single-reload guarantee of the
-  `manage_background` cascade, and the startup-sync immediate branch.
 
 ## 0.3.0 — Sync controls, performance, and polish
 
@@ -92,6 +71,11 @@ Worked through an external code review (issue #3) end to end:
   now detects a running Ghostty.
 - **Docs and infra** — vimdoc (`:help ghostty-mirror`) and a stylua lint gate
   in CI.
+
+0.3.1 worked through an external code review (issue #3) end to end: name
+sanitization ahead of paths and commands, fail-fast config validation, setup
+lifecycle cleanup, a Neovim 0.10+ version floor, and coverage growth to 90
+specs.
 
 ## 0.2.0 — tmux support
 

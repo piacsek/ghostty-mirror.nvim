@@ -108,6 +108,7 @@ How the user likes work to flow — follow it unless told otherwise:
 ## Docs
 
 - `README.md` is user-facing and authoritative. Any config option, command, or behavior change must be reflected there (setup block, Usage, How it works) **and** in the vimdoc at `doc/ghostty-mirror.txt` — the two must not drift.
+- `ROADMAP.md` lists **major and minor milestones only** (newest first, planned work on top). Patch releases are documented in GitHub releases, never as roadmap entries — at most a one-line "later X.Y.x patches ..." mention inside the parent minor's entry. A minor/major release adds its entry and renumbers any planned ones it displaced.
 - **Word choice:** prefer "Considerations" over "Caveats" — "caveat" reads as a gotcha/warning, which is off-putting for a plugin. Same for headings and inline ("two considerations", not "two caveats").
 - **No emojis** anywhere — README, release notes, commit messages, headings. Plain text only.
 - **Only real theme names in docs** (README, vimdoc, CLAUDE.md, LuaCATS annotations): built-ins (`ron`, `elflord`) or real plugins (`cyberdream`). Never invent one — a light-variant example is `cyberdream-light` (an actual scheme), not `ron-light` (doesn't exist). Placeholder names like `mytheme` stay confined to tests.
