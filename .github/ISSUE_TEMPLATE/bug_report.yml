@@ -1,0 +1,48 @@
+name: Bug report
+description: Something doesn't work the way the docs say it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: checkhealth
+    attributes:
+      label: Output of :checkhealth ghostty-mirror
+      description: Paste the full section. It covers most environment questions (Ghostty running, config-file wiring, theme paths).
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Plugin setup
+      description: Your require("ghostty-mirror").setup({...}) call, or "defaults" if you don't call it.
+      render: lua
+    validations:
+      required: true
+  - type: input
+    id: colorscheme
+    attributes:
+      label: Colorscheme involved
+      placeholder: e.g. cyberdream
+  - type: input
+    id: versions
+    attributes:
+      label: Neovim and Ghostty versions
+      placeholder: "nvim 0.11.0, Ghostty 1.1.3, macOS 15"
+    validations:
+      required: true
+  - type: checkboxes
+    id: desync-checklist
+    attributes:
+      label: If the theme is "stuck" or desynced
+      description: These are the usual suspects (see README, Troubleshooting). Confirm you've ruled them out.
+      options:
+        - label: No colorscheme picker preview involved, or debounce_ms is not 0
+        - label: My nvim config does not read theme_file at startup to pick the colorscheme
+        - label: Only one nvim instance was writing to theme_file, or last-writer-wins is not the issue
