@@ -80,10 +80,13 @@ require("ghostty-mirror").setup({
   is applied as a colorscheme automatically (limited to schemes you have
   installed).
 - `:ThemeToGhostty` → force-regenerate the current colorscheme's theme from
-  live highlights, overwriting any cached/hand-made file. Handy after you
-  tweak a colorscheme's options and want Ghostty to pick up the new colors.
+  live highlights, overwriting a cached file. Handy after you tweak a
+  colorscheme's options and want Ghostty to pick up the new colors. A
+  hand-made theme file is refused with a warning — `:ThemeToGhostty!`
+  overwrites it too.
 - `:ThemeToTmux` → force-regenerate the current colorscheme's tmux theme (when
-  tmux mirroring is enabled). The tmux analog of `:ThemeToGhostty`.
+  tmux mirroring is enabled). The tmux analog of `:ThemeToGhostty`, bang
+  included.
 - `:ThemeCacheClear` → delete generated theme files (recognized by their header
   line — an edited file keeping it still counts as generated), leaving hand-made
   ones untouched. Use it when a cached theme has gone stale; the next
@@ -280,14 +283,16 @@ The plugin snapshots it on `ColorSchemePre` and emits `palette` lines only when
 the scheme actually changed it. Most schemes (tokyonight, kanagawa, gruvbox,
 rose-pine, …) set it, so generation is zero-config; some (e.g. catppuccin) gate
 it behind a `term_colors` option — for those, or for pixel-perfect control, drop
-a hand-made file. `:ThemeToGhostty` bypasses this and writes the full live palette.
+a hand-made file. `:ThemeToGhostty` bypasses the palette gate and writes the
+full live palette (over a hand-made file it needs the bang).
 
 `ColorScheme` is **debounced** (`debounce_ms`, default 150) so a colorscheme
 picker's live preview pushes once the selection settles, not per previewed
 scheme. `:ThemeToGhostty` / `:ThemeToTmux` act immediately.
 
 The plugin owns *only* the include file and the themes it generates — never your
-main Ghostty config or hand-made theme files. It also refuses to write through
+main Ghostty config or hand-made theme files (a banged `:ThemeToGhostty!` /
+`:ThemeToTmux!` is the one deliberate exception). It also refuses to write through
 a symlink or hard link at any of its destinations (the include files and theme
 cache paths) and reads them back only as regular files, so keep those as
 plain single-name regular files — a

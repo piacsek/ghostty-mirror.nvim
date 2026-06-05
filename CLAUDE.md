@@ -40,7 +40,7 @@ Setup warns on overrides that can't take effect; generation falls back on bad
 values. Hand-made files are never modified by overrides.
 
 Commands: `:ThemeFromGhostty` (pull), `:ThemeToGhostty`/`:ThemeToTmux` (force-push,
-immediate), `:ThemeCacheClear` (delete generated theme files, leaving hand-made ones).
+immediate; a hand-made target is refused without the bang), `:ThemeCacheClear` (delete generated theme files, leaving hand-made ones).
 
 ### How a theme is resolved (precedence)
 

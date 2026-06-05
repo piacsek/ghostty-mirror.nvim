@@ -708,9 +708,25 @@ function M.resolve(colorscheme)
 	return nil
 end
 
+---Whether a force may regenerate over the file at `path`: a hand-made theme
+---file is the one file on the force path the plugin would destroy without
+---owning, so clobbering it takes an explicit opt-in (the commands' bang).
+---Warns so the refusal isn't a silent mystery — force is always user-initiated.
+---@param path string
+---@param opts? { clobber?: boolean }
+---@return boolean
+local function force_may_write(path, opts)
+	if (opts and opts.clobber) or not vim.uv.fs_stat(path) or is_generated(path) then return true end
+	vim.notify(
+		"ghostty-mirror: " .. path .. " is hand-made; use a bang (:ThemeToGhostty!/:ThemeToTmux!) to overwrite it",
+		vim.log.levels.WARN
+	)
+	return false
+end
+
 ---Write the resolved theme to the theme file and signal Ghostty to reload.
 ---@param colorscheme string
----@param opts? { force?: boolean } # force regenerates from live highlights, ignoring any existing file
+---@param opts? { force?: boolean, clobber?: boolean } # force regenerates from live highlights, ignoring any existing generated file; clobber lets force overwrite a hand-made one
 ---@return string|nil # the theme name written, or nil when nothing was written
 function M.push(colorscheme, opts)
 	-- No scheme to mirror (e.g. an aborted colorscheme load leaves colors_name
@@ -718,6 +734,7 @@ function M.push(colorscheme, opts)
 	if not colorscheme or not valid_name(colorscheme) then return end
 	local name, regenerated
 	if opts and opts.force then
+		if not force_may_write(M.config.themes_dir .. "/" .. target_name(colorscheme), opts) then return end
 		-- An explicit force trusts whatever palette is live right now.
 		palette_owned = true
 		name = M.write_generated(colorscheme)
@@ -757,13 +774,14 @@ end
 ---tell the running tmux server to source it. No-op (no reload) when nothing
 ---resolves. Fails silently if no tmux server is running.
 ---@param colorscheme string
----@param opts? { force?: boolean }
+---@param opts? { force?: boolean, clobber?: boolean }
 ---@return string|nil # the theme name written, or nil when nothing was written
 function M.push_tmux(colorscheme, opts)
 	if not colorscheme or not valid_name(colorscheme) then return end
 	local cfg = M.config.tmux
 	local name, regenerated
 	if opts and opts.force then
+		if not force_may_write(cfg.themes_dir .. "/" .. target_name(colorscheme) .. ".conf", opts) then return end
 		palette_owned = true
 		name = M.write_tmux_generated(colorscheme)
 	else
@@ -1085,13 +1103,23 @@ function M.setup(opts)
 		desc = "Apply the colorscheme currently set in Ghostty's theme-current file",
 	})
 
-	vim.api.nvim_create_user_command("ThemeToGhostty", function() M.push(M.current_scheme(), { force = true }) end, {
-		desc = "Regenerate the current colorscheme's Ghostty theme from live highlights",
-	})
+	vim.api.nvim_create_user_command(
+		"ThemeToGhostty",
+		function(cmd) M.push(M.current_scheme(), { force = true, clobber = cmd.bang }) end,
+		{
+			bang = true,
+			desc = "Regenerate the current colorscheme's Ghostty theme from live highlights (! overwrites a hand-made file)",
+		}
+	)
 
-	vim.api.nvim_create_user_command("ThemeToTmux", function() M.push_tmux(M.current_scheme(), { force = true }) end, {
-		desc = "Regenerate the current colorscheme's tmux theme from live highlights",
-	})
+	vim.api.nvim_create_user_command(
+		"ThemeToTmux",
+		function(cmd) M.push_tmux(M.current_scheme(), { force = true, clobber = cmd.bang }) end,
+		{
+			bang = true,
+			desc = "Regenerate the current colorscheme's tmux theme from live highlights (! overwrites a hand-made file)",
+		}
+	)
 
 	vim.api.nvim_create_user_command("ThemeCacheClear", function()
 		local cleared = M.clear_cache()
