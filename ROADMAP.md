@@ -22,8 +22,9 @@ file unless banged (`:ThemeToGhostty!`), closing the one path where the
 plugin could destroy a file it doesn't own — `M.push`/`M.push_tmux` grew a
 matching `clobber` opt. And the write proof that refuses symlinked
 destinations now refuses hard links too (`nlink == 1`), so a planted link of
-either kind can't redirect a theme write into another file. A later 0.6.x
-patch made theme and pointer writes atomic (temp file, fsync, rename).
+either kind can't redirect a theme write into another file. Later 0.6.x
+patches made theme and pointer writes atomic (temp file, fsync, rename) and
+scoped the bang to its own target.
 
 ## 0.5.0 — Per-theme Ghostty overrides
 
