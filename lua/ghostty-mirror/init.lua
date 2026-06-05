@@ -113,7 +113,11 @@ local function valid_name(name) return name:match(safe_name_pattern) ~= nil and 
 ---The temp name is pid-qualified: writes within one instance are serialized
 ---by the event loop, so only a leftover from a crashed same-pid writer (or a
 ---planted entry) can hold it — O_EXCL refuses, the entry itself is unlinked
----(unlink doesn't follow links), and one retry settles it.
+---(unlink doesn't follow links), and one retry settles it. The unlink is
+---unconditional — accepted: a non-plugin file at exactly `<path>.<pid>.tmp`
+---takes a pid collision to exist, and a planted directory (which unlink
+---can't clear) only wedges this one destination's writes — same-user DoS,
+---outside the threat model.
 ---Returns whether the write happened — fail silently, never wrongly.
 ---@param lines string[]
 ---@param path string
@@ -704,6 +708,10 @@ end
 ---file is the one file on the force path the plugin would destroy without
 ---owning, so clobbering it takes an explicit opt-in (the commands' bang).
 ---Warns so the refusal isn't a silent mystery — force is always user-initiated.
+---The check and the eventual write are separate steps, so a racer swapping a
+---hand-made file in after the check loses it — accepted, like clear_cache's
+---check-then-delete: luv offers no atomic marker-check-and-replace, and the
+---window needs a hostile same-user racer inside a user-initiated force.
 ---@param path string
 ---@param opts? { clobber?: boolean }
 ---@return boolean

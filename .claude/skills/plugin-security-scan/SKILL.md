@@ -55,6 +55,17 @@ accepted) is noise, not signal.
    - A planted symlink/hard link *at a write destination* being **replaced** by
      the atomic rename (target untouched). Replacing the entry is the designed
      leaf defense, not a clobbering bug — last-writer-wins on the entry itself.
+   - `write_atomic`'s unconditional unlink on the `O_EXCL` retry — a non-plugin
+     file at exactly `<path>.<pid>.tmp` takes a pid collision to exist, and a
+     planted directory there (which unlink can't clear) only wedges writes to
+     that one destination: same-user DoS, outside the threat model. Documented
+     in the code comment.
+   - The check-then-write window on the hand-made bang protection
+     (`force_may_write`'s `is_generated` read vs. the later rename) — same
+     class as `clear_cache`'s check-then-delete: luv offers no atomic
+     marker-check-and-replace, the window needs a hostile same-user racer
+     inside a user-initiated force, and the blast radius is the themes dirs.
+     Documented in the code comment.
 
    Re-raise one of these *only* if the code changed such that the reasoning no
    longer holds (e.g. a default flipped to on, or a name reaches a sink
