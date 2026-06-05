@@ -22,23 +22,63 @@ most important first. What to do about each finding is the user's call.
 
 ## Don't re-report what's already acknowledged
 
-Before reporting, reconcile against the issue tracker and the accepted-by-design
-baseline. A finding the user has already seen and filed (or consciously
-accepted) is noise, not signal.
+Before reporting, reconcile against the baselines below. A finding the user has
+already seen and accepted (or fixed) is noise, not signal.
+
+The historical security issues (#3, #8–#15 — the 2026-06-04 scan logs) were
+**hard-deleted from the tracker on 2026-06-05**: posting vulnerability detail
+in public issues was judged a disclosure mistake. Their durable content lives
+in this file — fixed findings under "Fixed", standing decisions under
+"Accepted by design". Do not suggest filing findings as public issues;
+anything that needs tracking goes through GitHub's private vulnerability
+reporting.
 
 1. Run `gh issue list --label security --state all --json number,title,state,body`.
-2. **Open** security issue → the finding is **acknowledged and tracked**. Do not
-   list it as a new finding. If it still reproduces, mention it in one line under
-   an "Already tracked" note (`#13 (torn read), #15 (hard-link write) — still
-   open, not re-detailing`). If an open issue no longer reproduces, say so — a
-   tracked issue that's been quietly fixed is worth flagging.
-3. **Closed** security issue → its findings are presumed **fixed**. Spot-check
-   that the fix is still in place (a regression check — read the cited lines),
-   and only surface it if it has actually regressed. Map closed issues to their
-   fix commits via `git log` when in doubt.
-4. **Accepted by design** (never re-raise as actionable; these are stable
-   trust-model decisions, documented in CLAUDE.md, code comments, and prior
-   issue "No action planned" sections):
+   An **empty list is the expected steady state**. If an issue does appear:
+   **open** → acknowledged and tracked; don't re-detail it, just note in one
+   line whether it still reproduces (a tracked issue that's been quietly fixed
+   is worth flagging). **Closed** → presumed fixed; spot-check the cited lines
+   and only surface it if it regressed.
+2. **Fixed** (regression-check only — verify the defense still holds at every
+   listed point; re-raise only as a regression, never as the old finding).
+   Findings from the deleted issues, grouped by the defense that closed them:
+   - **`valid_name` at every name entry** — closed: unguarded `pull`/
+     `read_current` feeding `vim.cmd.colorscheme` a planted `../` name; the
+     public `generate`/`generate_tmux`/`write_generated`/`write_tmux_generated`
+     lacking self-guards; `.`/`..` passing the pattern.
+   - **`light_variant_suffix` validated at setup *and* re-checked at use**
+     (`safe_suffix`) — closed: the suffix bypassing `valid_name` into paths and
+     pointer lines.
+   - **tmux paths rejected at setup (quotes, backslashes, newlines) *and*
+     re-checked at the sink** (`tmux_pointer_line`) — closed: `themes_dir`
+     interpolated unescaped into the quoted `source-file` line tmux executes;
+     backslash mangling inside the double quotes.
+   - **Colors normalized at every emission** — closed: raw `g:terminal_color_*`
+     values carrying a newline into the generated file (`snapshot_palette` now
+     normalizes per slot); `hex()` emitting >6 digits for out-of-range numbers
+     (now bounded to 24 bits).
+   - **Hardened reads** (`read_head`, health's `read_lines`: `O_NONBLOCK` +
+     fstat `type == "file"` + byte cap) — closed: planted FIFO / `/dev/zero`
+     symlink hanging the editor; E484 vanish races on raw `readfile`;
+     `health.lua` bypassing the hardened path.
+   - **`write_atomic`** (same-dir `O_CREAT|O_EXCL` temp, fsync, rename, dir
+     fsync) — closed: lstat-to-write TOCTOU; dangling-symlink `O_CREAT`
+     residue; torn/partial files under concurrent readers; hard-link
+     write-through into a victim file; in-place truncate-and-write.
+   - **Force-path bang protection** (`force_may_write` + the commands' bang,
+     clobber scoped to its own target) — closed: `:ThemeToGhostty` silently
+     destroying a hand-made theme; the bang's consent leaking to the chained
+     tmux push.
+   - **CI pins and token scope** — closed: floating action tags, stylua
+     `version: latest`, plenary cloned at HEAD, missing `permissions:` block.
+     All actions SHA-pinned, stylua and plenary version/SHA-pinned,
+     `permissions: contents: read`.
+   - **Test sandbox** — closed: `$XDG_CONFIG_HOME` escaping the `$HOME`
+     sandbox in `tests/minimal_init.lua`; both now point into the throwaway
+     dir.
+3. **Accepted by design** (never re-raise as actionable; these are stable
+   trust-model decisions, documented in CLAUDE.md, code comments, and the
+   deleted issues' "No action planned" sections):
    - `$PATH`-resolved `pkill`/`tmux`/`pgrep` — argv lists, same-user trust model.
    - `theme_file` (and the tmux pointer) as a same-user control channel:
      `sync_on_startup`/`sync_on_focus`/`:ThemeFromGhostty` apply an installed
@@ -48,7 +88,12 @@ accepted) is noise, not signal.
      confined to the themes dirs; `vim.fs.dir` `type == "file"` excludes symlinks.
      Documented in the code comment.
    - The marker-line ownership model — a file whose first line is the generated
-     marker is plugin-owned and may be cleared/regenerated. Documented.
+     marker is plugin-owned and may be cleared/regenerated, including a
+     hand-edited copy that keeps the header (delete the first line to claim a
+     generated file as hand-made). Documented.
+   - Multiple nvim instances racing on one `theme_file` — last-writer-wins by
+     design; that's how `:ThemeFromGhostty` syncs windows. Documented in
+     CLAUDE.md.
    - A symlinked *themes_dir directory component* redirecting writes/deletes —
      `write_atomic` guards the leaf only; the dirs are assumed real
      directories (stated trust assumption).
@@ -231,10 +276,10 @@ Each finding:
 
 End the report with:
 - a one-line-per-finding summary table;
-- a one-line "Already tracked" note listing any open issues that still reproduce
-  (by number, not re-detailed);
-- a one-line note of any closed-issue fixes you re-verified as still holding (or
-  flag any that regressed);
+- a one-line "Already tracked" note for any open security issues that still
+  reproduce (by number, not re-detailed) — expected to be empty;
+- a one-line note that the "Fixed" baseline defenses were re-verified as still
+  holding (or flag any that regressed);
 - the explicit statement that nothing was modified.
 
 If the scan comes up clean at a given severity, say so — "no Critical or High
