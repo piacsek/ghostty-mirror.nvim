@@ -30,8 +30,8 @@ Both must pass; CI runs them on Neovim stable and nightly for every push and PR.
 - **Indentation is tabs** in Lua sources. `stylua .` fixes formatting.
 - **LuaCATS annotations** on every public function and config field, matching
   the existing density.
-- **No-op, but never silently:** never write something Ghostty can't load —
-  on missing or invalid inputs, skip the write. But don't leave the user
+- **No-op, but never silently:** never write something Ghostty, nvim, or
+  tmux can't load — on missing or invalid inputs, skip the write. But don't leave the user
   guessing: config is parsed and validated, and a value that can't take
   effect draws a `vim.notify(..., vim.log.levels.WARN)` explaining what was
   rejected (see the setup-time override warnings for the pattern).
