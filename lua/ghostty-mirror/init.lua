@@ -714,11 +714,12 @@ end
 ---window needs a hostile same-user racer inside a user-initiated force.
 ---@param path string
 ---@param opts? { clobber?: boolean }
+---@param bang_cmd string # the banged command that may overwrite this target
 ---@return boolean
-local function force_may_write(path, opts)
+local function force_may_write(path, opts, bang_cmd)
 	if (opts and opts.clobber) or not vim.uv.fs_stat(path) or is_generated(path) then return true end
 	vim.notify(
-		"ghostty-mirror: " .. path .. " is hand-made; use a bang (:ThemeToGhostty!/:ThemeToTmux!) to overwrite it",
+		"ghostty-mirror: " .. path .. " is hand-made; use " .. bang_cmd .. " to overwrite it",
 		vim.log.levels.WARN
 	)
 	return false
@@ -734,7 +735,9 @@ function M.push(colorscheme, opts)
 	if not colorscheme or not valid_name(colorscheme) then return end
 	local name, regenerated
 	if opts and opts.force then
-		if not force_may_write(M.config.themes_dir .. "/" .. target_name(colorscheme), opts) then return end
+		if not force_may_write(M.config.themes_dir .. "/" .. target_name(colorscheme), opts, ":ThemeToGhostty!") then
+			return
+		end
 		-- An explicit force trusts whatever palette is live right now.
 		palette_owned = true
 		name = M.write_generated(colorscheme)
@@ -754,7 +757,10 @@ function M.push(colorscheme, opts)
 			vim.system(M.config.reload_command, { detach = true })
 		end
 	end
-	if M.config.tmux.enabled then M.push_tmux(colorscheme, opts) end
+	-- The chained tmux push inherits force but not clobber: a bang on
+	-- :ThemeToGhostty consents to overwriting the hand-made *Ghostty* theme,
+	-- not the tmux one — that takes its own :ThemeToTmux!.
+	if M.config.tmux.enabled then M.push_tmux(colorscheme, opts and { force = opts.force }) end
 	return name
 end
 
@@ -781,7 +787,9 @@ function M.push_tmux(colorscheme, opts)
 	local cfg = M.config.tmux
 	local name, regenerated
 	if opts and opts.force then
-		if not force_may_write(cfg.themes_dir .. "/" .. target_name(colorscheme) .. ".conf", opts) then return end
+		if not force_may_write(cfg.themes_dir .. "/" .. target_name(colorscheme) .. ".conf", opts, ":ThemeToTmux!") then
+			return
+		end
 		palette_owned = true
 		name = M.write_tmux_generated(colorscheme)
 	else

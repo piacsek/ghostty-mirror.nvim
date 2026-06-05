@@ -55,6 +55,9 @@ Setup is automatic with defaults; call |ghostty-mirror.setup()| to override.
                     from live highlights, overwriting a cached file. Useful
                     after tweaking a colorscheme's options. A hand-made theme
                     file is refused with a warning; add ! to overwrite it too.
+                    The bang covers only the Ghostty file: the tmux push it
+                    chains into still refuses a hand-made .conf, which takes
+                    its own |:ThemeToTmux|!.
 
                                                                   *:ThemeToTmux*
 :ThemeToTmux[!]     The tmux analog of |:ThemeToGhostty| (when tmux mirroring

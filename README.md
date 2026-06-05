@@ -83,7 +83,9 @@ require("ghostty-mirror").setup({
   live highlights, overwriting a cached file. Handy after you tweak a
   colorscheme's options and want Ghostty to pick up the new colors. A
   hand-made theme file is refused with a warning — `:ThemeToGhostty!`
-  overwrites it too.
+  overwrites it too. The bang covers only the Ghostty file: the tmux push it
+  chains into (when mirroring is enabled) still refuses a hand-made `.conf`,
+  which takes its own `:ThemeToTmux!`.
 - `:ThemeToTmux` → force-regenerate the current colorscheme's tmux theme (when
   tmux mirroring is enabled). The tmux analog of `:ThemeToGhostty`, bang
   included.
