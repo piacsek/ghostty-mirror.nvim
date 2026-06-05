@@ -254,6 +254,35 @@ describe("ghostty-mirror", function()
 			end)
 		end)
 
+		it("fsyncs the destination directory after the rename so the write survives a crash", function()
+			with_palette(function()
+				with_tmp_dir(function(dir)
+					local themes_dir = dir .. "/themes"
+					vim.fn.mkdir(themes_dir, "p")
+					-- Map fds back to paths so the fsync capture can tell the
+					-- directory's fsync from the temp file's.
+					local opened, fsynced = {}, {}
+					local real_open, real_fsync = vim.uv.fs_open, vim.uv.fs_fsync
+					vim.uv.fs_open = function(path, flags, mode) ---@diagnostic disable-line: duplicate-set-field
+						local fd = real_open(path, flags, mode)
+						if fd then opened[fd] = path end
+						return fd
+					end
+					vim.uv.fs_fsync = function(fd) ---@diagnostic disable-line: duplicate-set-field
+						table.insert(fsynced, opened[fd])
+						return real_fsync(fd)
+					end
+					local mirror = fresh_require()
+					mirror.setup({ themes_dir = themes_dir, generate = true })
+					local ok, result = pcall(mirror.write_generated, "mytheme")
+					vim.uv.fs_open, vim.uv.fs_fsync = real_open, real_fsync
+					assert.is_true(ok, tostring(result))
+					assert.equals("mytheme", result)
+					assert.is_true(vim.tbl_contains(fsynced, themes_dir))
+				end)
+			end)
+		end)
+
 		it("push_tmux replaces a symlinked tmux theme_file and reloads, leaving the target untouched", function()
 			with_palette(function()
 				with_tmp_dir(function(dir)

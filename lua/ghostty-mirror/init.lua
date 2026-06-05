@@ -102,7 +102,8 @@ local function valid_name(name) return name:match(safe_name_pattern) ~= nil and 
 
 ---Write lines to a path atomically: the bytes land in a same-directory
 ---O_CREAT|O_EXCL temp file, are fsynced, and the temp is renamed over the
----destination. A concurrent reader (Ghostty on SIGUSR2, tmux source-file,
+---destination (the directory is then fsynced too, so the rename survives a
+---crash). A concurrent reader (Ghostty on SIGUSR2, tmux source-file,
 ---another instance's read_head) sees the old content or the new, never a
 ---torn file, and concurrent writers settle to clean last-writer-wins.
 ---The rename also carries the symlink-refusal proof the old in-place write
@@ -137,6 +138,17 @@ local function write_atomic(lines, path)
 	vim.uv.fs_close(fd)
 	ok = ok and vim.uv.fs_rename(tmp, path) ~= nil
 	if not ok then vim.uv.fs_unlink(tmp) end
+	if ok then
+		-- fsync the directory too, so the rename itself survives a crash.
+		-- Best-effort: the file is already visible to every reader, so a
+		-- failure here must not report the write as failed — that would
+		-- suppress a reload of content that did change.
+		local dfd = vim.uv.fs_open(vim.fs.dirname(path), c.O_RDONLY, 0)
+		if dfd then
+			vim.uv.fs_fsync(dfd)
+			vim.uv.fs_close(dfd)
+		end
+	end
 	return ok
 end
 
