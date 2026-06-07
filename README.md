@@ -1,6 +1,6 @@
 # ghostty-mirror.nvim
 
-<img width="200" height="200" alt="ghostty-mirror logo" src="assets/logo.png" />
+<img alt="ghostty-mirror logo" src="assets/logo.png" />
 
 
 Mirror Neovim's colorscheme into [Ghostty](https://ghostty.org) (and, optionally,
