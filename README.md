@@ -129,28 +129,6 @@ To hand-author a theme instead of generating one, drop a
 `themes_dir/<name>.conf` — it always wins over generation, exactly like Ghostty
 ([guide](docs/manual_tmux_themes.md)).
 
-<details>
-<summary>How I wire it into my <code>tmux.conf</code></summary>
-
-```tmux
-# Colors can be overridden by re-setting these options after your own theme
-# block — that's exactly what ghostty-mirror's generated theme does on reload.
-
-# Window labels: name only, color-free, so the styles from the generated theme
-# apply (an inline #[bg=…] would override them).
-set-window-option -g window-status-format " #W "
-set-window-option -g window-status-current-format " #W "
-
-# Re-apply the last mirrored theme on server start (the plugin only sources
-# it into a running server).
-if-shell "test -f ~/.config/tmux/theme-current.conf" \
-  "source-file ~/.config/tmux/theme-current.conf"
-
-# Forward focus events so sync_on_focus fires when you switch panes.
-set-option -g focus-events on
-```
-</details>
-
 ### Per-theme overrides
 
 When generation is almost right, tweak a single theme from config instead of
