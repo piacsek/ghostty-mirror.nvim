@@ -41,7 +41,7 @@ vim.pack.add({ "https://github.com/piacsek/ghostty-mirror.nvim" })
   "piacsek/ghostty-mirror.nvim",
   event = "VimEnter",
   cmd = { "ThemeFromGhostty", "ThemeToGhostty", "ThemeToTmux", "ThemeCacheClear" },
-  keys = { { "<M-t>", desc = "Pull theme from Ghostty" } },
+  keys = { { "<M-t>", "<cmd>ThemeFromGhostty<cr>", desc = "Pull theme from Ghostty" } },
   config = function()
     local ghostty_mirror = require("ghostty-mirror")
     ghostty_mirror.setup({
