@@ -116,6 +116,8 @@ require("ghostty-mirror").setup({
 
 2. `tmux.conf` changes
 
+Add the following to your tmux config file:
+
 ```tmux
    if-shell "test -f ~/.config/tmux/theme-current.conf" \
      "source-file ~/.config/tmux/theme-current.conf"
