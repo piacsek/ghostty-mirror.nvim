@@ -42,28 +42,24 @@ vim.pack.add({ "https://github.com/piacsek/ghostty-mirror.nvim" })
   "piacsek/ghostty-mirror.nvim",
   event = "VimEnter",
   cmd = { "ThemeFromGhostty", "ThemeToGhostty", "ThemeToTmux", "ThemeCacheClear" },
+  keys = { { "<M-t>", desc = "Pull theme from Ghostty" } },
+  config = function()
+    local ghostty_mirror = require("ghostty-mirror")
+    ghostty_mirror.setup({
+       themes_dir = "~/.config/ghostty/themes",          -- where themes live / are cached
+       theme_file = "~/.config/ghostty/theme-current",   -- the include file the plugin writes
+       light_variant_suffix = "-light",                  -- light/dark variant routing
+       generate = true,                                  -- false to require hand-made files
+       reload_command = { "pkill", "-SIGUSR2", "ghostty" },
+       debounce_ms = 150,                                 -- coalesce rapid switches (e.g. a picker's live preview); 0 = immediate
+       overrides = {},                                    -- per-theme tweaks merged into generation (see Per-theme overrides)
+       manage_background = false,                         -- opt-in: keep &background honest across switches (see Troubleshooting)
+       sync_on_startup = false,                           -- opt-in: on launch, apply the theme Ghostty currently points at
+       sync_on_focus = false,                             -- opt-in: on FocusGained, re-sync to the theme another nvim last wrote
+       tmux = { enabled = false },                        -- opt-in tmux statusline mirroring (see below)
+    })
+  end,
 }
-```
-
-The plugin auto-registers the `ColorScheme` autocmd and the `ThemeFromGhostty`,
-`ThemeToGhostty`, `ThemeToTmux`, and `ThemeCacheClear` commands.
-
-To override the defaults, call `setup`:
-
-```lua
-require("ghostty-mirror").setup({
-  themes_dir = "~/.config/ghostty/themes",          -- where themes live / are cached
-  theme_file = "~/.config/ghostty/theme-current",   -- the include file the plugin writes
-  light_variant_suffix = "-light",                  -- light/dark variant routing
-  generate = true,                                  -- false to require hand-made files
-  reload_command = { "pkill", "-SIGUSR2", "ghostty" },
-  debounce_ms = 150,                                 -- coalesce rapid switches (e.g. a picker's live preview); 0 = immediate
-  overrides = {},                                    -- per-theme tweaks merged into generation (see Per-theme overrides)
-  manage_background = false,                         -- opt-in: keep &background honest across switches (see Troubleshooting)
-  sync_on_startup = false,                           -- opt-in: on launch, apply the theme Ghostty currently points at
-  sync_on_focus = false,                             -- opt-in: on FocusGained, re-sync to the theme another nvim last wrote
-  tmux = { enabled = false },                        -- opt-in tmux statusline mirroring (see below)
-})
 ```
 
 ## Usage
@@ -101,7 +97,7 @@ the hand-made-file escape hatch.
 
 ### tmux
 
-Opt in to mirror the colorscheme into tmux's statusline too:
+1. Opt in to mirror the colorscheme into tmux's statusline too:
 
 ```lua
 require("ghostty-mirror").setup({
@@ -118,30 +114,14 @@ require("ghostty-mirror").setup({
 })
 ```
 
-On `:colorscheme` the plugin writes `set -g *-style` lines to
-`themes_dir/<name>.conf`, points `theme_file` at it, and runs `tmux source-file`.
-The opinion, all highlight-derived so it follows any scheme:
+2. `tmux.conf` changes
 
-- **Bar** = the theme background blended toward the accent — toward the
-  *foreground* on light themes, since a light bg barely moves toward a mid-tone
-  accent. Every base segment (incl. `status-left`) shares this one color.
-- **Accent** (selected window, active divider) = the fg of a highlight group
-  (`accent_hl`, default `Type`), harmonizing with each scheme's hue; text on it
-  is contrast-picked. It shows only on the current window — plus a `status-right`
-  pill on dark themes (light themes stay single-color).
-- **Inactive divider** = `WinSeparator`.
-
-**Two considerations for your `tmux.conf`:**
-
-1. tmux applies colors via `*-style` options, so your `window-status-format` /
-   `window-status-current-format` must **not** hardcode colors inline (`#[bg=…]`
-   overrides the style). Keep them layout-only, e.g. `" #I #W "`.
-2. To survive a tmux *server* restart, source the pointer once at startup,
-   *after* your own theme block:
-   ```tmux
+```tmux
    if-shell "test -f ~/.config/tmux/theme-current.conf" \
      "source-file ~/.config/tmux/theme-current.conf"
-   ```
+```
+
+Note: For a fully functional integration, your tmux config **must not** contain any colour-related settings or plugins.
 
 To hand-author a theme instead of generating one, drop a
 `themes_dir/<name>.conf` — it always wins over generation, exactly like Ghostty
@@ -218,24 +198,6 @@ param, invalid value); a bad value falls back to the highlight-derived color
 rather than producing a broken theme. Overrides apply only to generated
 themes; a hand-made file is never modified (edit it directly instead).
 
-#### Who paints what
-
-An override that "doesn't work" is usually another layer painting what you're
-looking at. The override always lands in the theme file; whether you *see* it
-depends on who renders that pixel:
-
-| You're looking at | Painted by | Governed by |
-|---|---|---|
-| Text, background, Visual selection, cursor *inside nvim* | nvim | the colorscheme's highlights (`Normal`, `Visual`, `Cursor`) |
-| Mouse-drag selection *inside tmux* | tmux copy-mode | the generated tmux theme's `mode-style` (from `accent`) |
-| Prompt text, padding, Shift+drag selection, anything outside nvim/tmux | Ghostty | the theme file — where overrides apply |
-
-So a `selection_background` override shows on a Shift+drag (bypasses tmux's
-mouse reporting) or in a pane without tmux — a plain drag inside tmux is
-tmux's selection, and Visual mode is nvim's. To recolor a layer, change that
-layer's source: the scheme's highlights for nvim, the tmux `accent` for
-copy-mode, the override for Ghostty.
-
 ### Cursor color
 
 The generated theme includes a `cursor-color`, but **Ghostty only applies it on
@@ -253,72 +215,6 @@ vim.opt.guicursor = "n-v-c-sm:block-Cursor/lCursor,"
 This requires the colorscheme to define a `Cursor` highlight, and it governs
 the cursor only while Neovim is focused — the shell-prompt cursor still comes
 from Ghostty's config.
-
-
-## How it works
-
-A Ghostty theme is just a file at `~/.config/ghostty/themes/<name>` defining
-`background`, `foreground`, and the 16-color `palette`. On `:colorscheme`, the
-plugin writes `theme = <name>` to an include file (`theme_file`, default
-`~/.config/ghostty/theme-current`) and signals Ghostty (`SIGUSR2`) to reload.
-
-It picks `<name>` by precedence:
-
-1. A [hand-made](docs/manual_themes.md)/cached file at `themes_dir/<name>` wins
-   (honoring the `-light` variant when `&background` is `"light"`).
-2. Otherwise it's **generated** from live highlights — `background`/`foreground`
-   from `Normal`, `cursor-color`/`cursor-text` from `Cursor`,
-   `selection-background`/`selection-foreground` from `Visual`, `palette` from
-   `g:terminal_color_*` — and cached to
-   `themes_dir/<name>` to hand-edit later. (`generate = false` requires
-   hand-made files.)
-
-Ownership is decided by the file's first line: a cached file keeping the
-`# Generated by ghostty-mirror.nvim` header stays plugin-owned even after you
-edit it — `:ThemeCacheClear` deletes it, and an override edit regenerates over
-it. To claim an edited cache as hand-made, delete that header line.
-
-The highlight-derived colors always belong to the current scheme, so they
-mirror unconditionally. The palette is trickier: `g:terminal_color_*` is global
-and *sticky*, so a scheme that sets none of its own inherits the previous one's.
-The plugin snapshots it on `ColorSchemePre` and emits `palette` lines only when
-the scheme actually changed it. Most schemes (tokyonight, kanagawa, gruvbox,
-rose-pine, …) set it, so generation is zero-config; some (e.g. catppuccin) gate
-it behind a `term_colors` option — for those, or for pixel-perfect control, drop
-a hand-made file. `:ThemeToGhostty` bypasses the palette gate and writes the
-full live palette (over a hand-made file it needs the bang).
-
-`ColorScheme` is **debounced** (`debounce_ms`, default 150) so a colorscheme
-picker's live preview pushes once the selection settles, not per previewed
-scheme. `:ThemeToGhostty` / `:ThemeToTmux` act immediately.
-
-The plugin owns *only* the include file and the themes it generates — never your
-main Ghostty config or hand-made theme files (a banged `:ThemeToGhostty!` /
-`:ThemeToTmux!` is the one deliberate exception). Writes are **atomic**: each
-lands in a temp file renamed over the destination, so Ghostty, tmux, or another
-nvim instance reading mid-write sees the old content or the new, never a torn
-file, and concurrent instances settle to last-writer-wins. The rename means a
-symlink or hard link sitting at a destination (the include files and theme cache
-paths) is *replaced* by a plain file, never written through, and reads come back
-only from regular files — so keep those as plain single-name regular files; a
-symlinked parent directory (a dotfiles-style `~/.config/ghostty` link) is fine.
-The directories themselves are trusted as configured: writes and cache deletions
-follow wherever the configured paths lead.
-
-### Light/dark variants
-
-Some plugins (cyberdream) use the same `g:colors_name` for light and dark, so
-`ColorScheme` reports `cyberdream` either way. The plugin checks `&background`:
-when it's `"light"` and a `<name>-light` file exists, that's used instead
-(`light_variant_suffix`, default `-light`). Ship both `themes/cyberdream` and
-`themes/cyberdream-light` and the right one loads automatically. The suffix
-becomes part of file names and the pointer lines, so it's restricted to
-letters, digits, `.`, `_` and `-` — `setup()` errors on anything else.
-
-The pull direction understands these names too: when the theme file points at
-a `<name>-light` that isn't an installed colorscheme of its own,
-`:ThemeFromGhostty` (and the focus/startup syncs) applies the base scheme with
-`&background` set to `"light"` first, so the variant reproduces.
 
 ## Troubleshooting
 
