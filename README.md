@@ -41,12 +41,12 @@ vim.pack.add({ "https://github.com/piacsek/ghostty-mirror.nvim" })
 {
   "piacsek/ghostty-mirror.nvim",
   event = "VimEnter",
-  cmd = { "ThemeFromGhostty", "ThemeToGhostty", "ThemeCacheClear" },
+  cmd = { "ThemeFromGhostty", "ThemeToGhostty", "ThemeToTmux", "ThemeCacheClear" },
 }
 ```
 
 The plugin auto-registers the `ColorScheme` autocmd and the `ThemeFromGhostty`,
-`ThemeToGhostty`, and `ThemeCacheClear` commands.
+`ThemeToGhostty`, `ThemeToTmux`, and `ThemeCacheClear` commands.
 
 To override the defaults, call `setup`:
 
