@@ -154,7 +154,12 @@ sync_on_focus         boolean  false
 tmux                  table    { enabled = false, ... }
                       Opt-in tmux statusline mirroring. Fields: enabled,
                       themes_dir, theme_file, generate, reload_command,
-                      bar_blend, accent_hl, divider_hl, overrides. See the
+                      bar_blend, accent_hl, divider_hl, selection_hl,
+                      overrides. selection_hl (default "Visual") is the
+                      highlight group whose bg colors the copy-mode selection
+                      (mode-style), mirroring nvim's selection independently of
+                      the accent; it falls back to the accent when that group
+                      has no bg. See the
                       README. Two considerations for your tmux.conf: keep
                       window-status-format / window-status-current-format
                       layout-only (an inline #[bg=…] overrides the generated
@@ -170,11 +175,13 @@ tmux.overrides        table    {}               *ghostty-mirror-tmux-overrides*
                       Per-theme tweaks merged into tmux theme generation.
                       Same keying, validation and regeneration semantics as
                       |ghostty-mirror-overrides|. Recognized params: accent,
-                      divider, bar (colors, "#rgb" or "#rrggbb") and
-                      bar_blend (0..1). accent/divider/bar_blend replace
+                      divider, bar, selection (colors, "#rgb" or "#rrggbb")
+                      and bar_blend (0..1). accent/divider/bar_blend replace
                       generation's inputs, so derived colors recompute
                       coherently; bar sets the status bar color directly,
-                      bypassing the blend (and bar_blend). Example: >lua
+                      bypassing the blend (and bar_blend); selection sets the
+                      copy-mode selection background (its fg is contrast-picked).
+                      Example: >lua
                           tmux = { overrides = { ron = { accent = "#fff" } } }
 <
 
@@ -213,7 +220,8 @@ An override that "doesn't work" is usually another layer painting what you
 are looking at. Inside nvim, text, background, Visual selection and the
 cursor come from the colorscheme's highlights, not the theme file. Inside
 tmux, a mouse-drag selection is tmux copy-mode, colored by the generated tmux
-theme's mode-style (from accent). Ghostty's own colors — where overrides
+theme's mode-style (from selection_hl, the Visual highlight by default).
+Ghostty's own colors — where overrides
 apply — show at the prompt, in padding, and on a Shift+drag selection (which
 bypasses tmux's mouse reporting). To recolor a layer, change that layer's
 source.

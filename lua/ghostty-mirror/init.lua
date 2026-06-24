@@ -41,6 +41,7 @@ local M = {}
 ---@field divider? string Replaces the divider_hl-derived pane border color ("#rgb" or "#rrggbb").
 ---@field bar? string Sets the status bar color directly, bypassing the blend ("#rgb" or "#rrggbb"). Wins over bar_blend.
 ---@field bar_blend? number Replaces tmux.bar_blend for this theme only, 0..1. Ignored when bar is set.
+---@field selection? string Replaces the selection_hl-derived copy-mode selection background ("#rgb" or "#rrggbb"). Its foreground is contrast-picked.
 
 ---@class GhosttyMirrorTmuxConfig
 ---@field enabled? boolean Mirror the colorscheme into tmux's statusline on :colorscheme. Defaults to false (opt-in).
@@ -51,6 +52,7 @@ local M = {}
 ---@field bar_blend? number How far the status bar blends from Normal's background toward the accent, 0..1 (keeps it in-hue rather than greying toward white). Defaults to 0.22.
 ---@field accent_hl? string Highlight group whose fg is the bright accent (selected window, active divider, status-right). Sourcing it from a highlight lets the accent harmonize with each scheme's own hue. Defaults to "Type".
 ---@field divider_hl? string Highlight group whose fg colors the inactive pane border. Defaults to "WinSeparator".
+---@field selection_hl? string Highlight group whose bg colors the copy-mode selection (mode-style), mirroring nvim's selection independently of the accent. Its fg is honored when present, else contrast-picked; falls back to the accent when the group has no bg. Defaults to "Visual".
 ---@field overrides? table<GhosttyMirrorThemeName, GhosttyMirrorThemeOverride> Per-theme tweaks merged into generation, keyed by resolved theme name (the light variant keys separately, e.g. "cyberdream-light"). Defaults to {}.
 
 ---@type GhosttyMirrorConfig
@@ -74,6 +76,7 @@ local defaults = {
 		bar_blend = 0.22,
 		accent_hl = "Type",
 		divider_hl = "WinSeparator",
+		selection_hl = "Visual",
 		overrides = {},
 	},
 }
@@ -430,6 +433,7 @@ local function tmux_effective_overrides(name)
 		divider = normalize_color(entry.divider),
 		bar = normalize_color(entry.bar),
 		bar_blend = valid_blend(entry.bar_blend) and entry.bar_blend or nil,
+		selection = normalize_color(entry.selection),
 	}
 end
 
@@ -535,7 +539,8 @@ end
 ---from Neovim's live highlights. Returns nil only when Normal has no fg/bg to
 ---anchor the theme. The status bar is the background "a little lighter"; the
 ---bright accent (selected window + active pane border) comes from the scheme's
----ANSI slot when it owns a full palette, else from a syntax highlight group.
+---ANSI slot when it owns a full palette, else from a syntax highlight group. The
+---copy-mode selection (mode-style) mirrors the selection_hl group's background.
 ---@param colorscheme string
 ---@return string[]|nil
 function M.generate_tmux(colorscheme)
@@ -568,6 +573,20 @@ function M.generate_tmux(colorscheme)
 
 	local bar_pair = ("bg=%s,fg=%s"):format(bar, fg)
 	local accent_pair = ("bg=%s,fg=%s"):format(accent, accent_fg)
+
+	-- The copy-mode selection (mode-style) mirrors nvim's selection highlight
+	-- (selection_hl, default Visual) so a drag in tmux copy mode reads like a
+	-- Visual selection in the editor — independent of the accent. The highlight's
+	-- own fg wins when it has one (an override sets only the bg, so contrast-pick
+	-- there); when the group carries no bg (e.g. a reverse-video Visual) there's
+	-- nothing to mirror, so fall back to the accent pill.
+	local sel_hl = hl(cfg.selection_hl)
+	local sel_bg = o.selection or hex(sel_hl.bg)
+	local mode_pair = accent_pair
+	if sel_bg then
+		local sel_fg = (not o.selection and hex(sel_hl.fg)) or readable_on(sel_bg, fg, bg)
+		mode_pair = ("bg=%s,fg=%s"):format(sel_bg, sel_fg)
+	end
 	-- Style every base segment (incl. status-left, which tmux leaves at the
 	-- theme default otherwise) with the bar color so the bar reads as one piece.
 	-- On a light theme the accent appears only on the current window; on a dark
@@ -585,7 +604,7 @@ function M.generate_tmux(colorscheme)
 		('set -g pane-border-style "fg=%s"'):format(divider),
 		('set -g message-style "%s"'):format(bar_pair),
 		('set -g message-command-style "%s"'):format(bar_pair),
-		('set -g mode-style "%s"'):format(accent_pair),
+		('set -g mode-style "%s"'):format(mode_pair),
 		('set -g clock-mode-colour "%s"'):format(accent),
 	}
 	-- Stamp the overrides that shaped this file so resolve_tmux can tell a
@@ -937,6 +956,7 @@ local tmux_config_types = {
 	bar_blend = "number",
 	accent_hl = "string",
 	divider_hl = "string",
+	selection_hl = "string",
 	overrides = "table",
 }
 
@@ -956,7 +976,8 @@ local function validate_config(cfg, types, prefix)
 end
 
 -- Recognized per-theme override params and their expected kind, per side.
-local tmux_override_params = { accent = "color", divider = "color", bar = "color", bar_blend = "blend" }
+local tmux_override_params =
+	{ accent = "color", divider = "color", bar = "color", bar_blend = "blend", selection = "color" }
 local ghostty_override_params = {
 	foreground = "color",
 	cursor_color = "color",

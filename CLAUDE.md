@@ -22,6 +22,10 @@ tmux mirroring (opt-in via `config.tmux.enabled`) adds siblings: `M.generate_tmu
 their Ghostty counterparts (same precedence). The tmux accent is the fg of a
 highlight group (`accent_hl`, default `Type`) so it harmonizes with each scheme's
 hue; the bar blends toward it and the selected-window text is contrast-picked.
+The copy-mode selection (`mode-style`) instead mirrors `selection_hl` (default
+`Visual`) — its bg, with its fg honored when present else contrast-picked —
+decoupling the selection from the accent; it falls back to the accent pill only
+when that group has no bg.
 Per-theme overrides (keyed by resolved name; `cyberdream`/`cyberdream-light` separate) merge
 into generation on both sides: top-level `overrides` for Ghostty — five emitted
 color keys as Lua-friendly underscores mapped to dashed directives
@@ -31,7 +35,7 @@ terminal background diverging from the editor's is the mismatch the plugin
 exists to prevent) plus individual `palette` slots, which substitute into an
 owned palette and emit a partial one when the scheme owns none — and
 `tmux.overrides` for tmux, replacing generation's inputs
-(`accent`/`divider`/`bar`/`bar_blend`). The effective set is stamped into the
+(`accent`/`divider`/`bar`/`bar_blend`/`selection`). The effective set is stamped into the
 generated file's header (`# overrides: ...`, palette slots flattened to
 `paletteN`) and both resolvers regenerate on a stamp mismatch — that's how
 override edits apply without `:ThemeCacheClear`. The resolvers' second return
@@ -70,7 +74,7 @@ not a mirror issue.
 
 An override that "doesn't work" usually *did* land in the theme file — another
 layer is painting the pixel. nvim paints its own cells (Normal/Visual/Cursor),
-tmux copy-mode paints mouse selections (`mode-style`, from the tmux accent);
+tmux copy-mode paints mouse selections (`mode-style`, from `selection_hl` — the Visual highlight by default);
 Ghostty's colors show at the prompt, padding, and Shift+drag selections. Check
 the generated file first: if the override is in it, the plugin is done and the
 question is which layer renders what the user is looking at. (Cursor colors

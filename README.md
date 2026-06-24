@@ -99,6 +99,7 @@ require("ghostty-mirror").setup({
     bar_blend = 0.22,                                -- status bar = Normal bg blended this far toward the accent
     accent_hl = "Type",                              -- highlight group whose fg is the bright accent (selected window)
     divider_hl = "WinSeparator",                     -- inactive pane border color
+    selection_hl = "Visual",                         -- highlight group whose bg colors the copy-mode selection (mode-style)
     overrides = {},                                  -- per-theme tweaks, see below
     -- reload_command = { "tmux", "source-file", "<theme_file>" },  -- default; override to taste
   },
@@ -136,7 +137,7 @@ require("ghostty-mirror").setup({
   },
   tmux = {
     overrides = {
-      ron = { accent = "#fff", divider = "#ccc", bar_blend = 0.3 },
+      ron = { accent = "#fff", divider = "#ccc", bar_blend = 0.3, selection = "#445" },
     },
   },
 })
