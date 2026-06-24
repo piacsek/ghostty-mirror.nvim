@@ -4,15 +4,18 @@ Milestones for ghostty-mirror.nvim, newest first (planned work at the top).
 Major and minor versions only — patch releases are documented in the
 [GitHub releases](https://github.com/piacsek/ghostty-mirror.nvim/releases).
 
-## 0.7.0 — Granular tmux overrides (planned)
+## 0.7.0 — Copy-mode selection follows nvim, not the accent
 
-Detach the tmux colors that are currently welded to the single `accent`
-input, starting with `copy_mode`: today `mode-style` (the copy-mode mouse
-selection) follows the accent, so "magenta selections, blue everything else"
-isn't expressible. A `copy_mode` override param sets it directly, with the
-selection text contrast-picked and everything else (pill, active border,
-status-right, clock) staying on `accent`. Unset keeps today's output
-byte-identical. Further params may follow the same pattern as needs surface.
+The tmux copy-mode selection (`mode-style`) was welded to the single `accent`
+input, so "magenta selection, blue everything else" wasn't expressible and the
+selection never tracked nvim's own. It now derives from a configurable
+highlight group, `tmux.selection_hl` (default `Visual`): its bg colors the
+selection, its fg is honored when present else contrast-picked, and it falls
+back to the accent only when the group carries no bg (e.g. a reverse-video
+Visual). A per-theme `selection` override sets the background directly. The
+accent still drives the pill, active border, status-right and clock — they're
+now independent. One behavior change: the default selection moves from
+accent-pink to the scheme's Visual, the natural mirror of nvim's selection.
 
 ## 0.6.0 — Force-push safety and link-proof writes
 
